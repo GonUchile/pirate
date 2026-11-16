@@ -1,0 +1,17 @@
+# Prueba de 64 beams del grupo 3 (21 504 canales, 1 ms), búsqueda hasta DM ~1107.
+# Bordes de banda = bordes de la grilla fina (672 canales x 32): 299,84978 - 501,75022 MHz.
+# Rank 15, un árbol, boxcar máximo 32 ms, CON subbandas [0,0,1,2,1] (kernel production chime_sb1): [416,7-501,8], [364,0-501,8], [327,3-416,7] y banda completa.
+zone_freq_edges: [299.8497764530551, 501.7502235469449]
+zone_nfreq: [21504]
+time_sample_ms: 1.0
+beams_per_gpu: 64
+dtype: float16
+time_samples_per_chunk: 2048
+frequency_subband_counts: [0,0,1,2,1]
+max_gpu_clag: 5
+beams_per_batch: 2
+num_active_batches: 2
+toplevel_tree_rank: 15
+primary_trees:
+  - {num_early_triggers: 0, max_width: 32, wt_dm_downsampling: 64, wt_time_downsampling: 64}
+future_write_max_samples: 5000

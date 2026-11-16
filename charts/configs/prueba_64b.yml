@@ -1,0 +1,65 @@
+# Prueba de 64 beams: UN archivo para el emisor, el servidor y el lanzador.
+# Los valores son los de las corridas reportadas en docs/RESULTADOS_64beams.md.
+# Las rutas aceptan variables de entorno ($VAR).
+
+prueba:
+  beams: 64
+  canales: 21504                     # 672 canales gruesos × 32
+  banda_mhz: [299.8497764530551, 501.7502235469449]
+  muestra_ms: 1.0
+  bloque_muestras: 2048              # un bloque (chunk) = 2,048 s
+
+red:
+  # Receptores del servidor de pirate: el emisor se conecta aquí. Para un emisor en otro PC, poner la IP del PC de
+  # búsqueda (no 127.0.0.1). Con más beams hacen falta más receptores (~11 Gbit/s por receptor).
+  receptores: ["127.0.0.1:5000"]
+  conexiones_por_receptor: 4         # cada conexión imita un nodo X-engine con un rango de canales
+  rpc: "127.0.0.1:6000"
+  grouper: "127.0.0.1:7000"
+  sifter: "127.0.0.1:7500"
+
+servidor:                            # PC de búsqueda
+  memoria_ram_gib: 150               # pool de pirate: estado del árbol (~20 GiB) + anillo de entrada
+  memoria_gpu_gib: 17
+  anillo_bloques: 64                 # 131 s de datos crudos en RAM
+  cpus: [0]
+  dedispersion:
+    rank: 15                         # DM ≤ 1105
+    max_gpu_clag: 5                  # bloques de estado del árbol en GPU; el resto en RAM
+    arboles:
+      - {num_early_triggers: 0, max_width: 32, wt_dm_downsampling: 64, wt_time_downsampling: 64}
+  grouper:
+    umbral: 6                        # S/N mínimo de los eventos enviados al sifter
+    registro_completo: true          # eventos_todos.log sin los topes de 4 por beam
+    perfil: false                    # tiempos por etapa en tiempos_grouper.csv
+    extra: []                        # opciones adicionales de grouper_v1.py
+  alertas:                           # sifter: qué evento es una alerta de FRB (servidor/sifter/sifter_alertas.py)
+    umbral: 7.6                      # S/N; ~10 falsas alarmas/h del sistema de 64 beams con RFI del sitio + máscara m1
+    dm_min: 20                       # la RFI terrestre tiene DM ~ 0
+    dm_max: null
+    max_beams: 8                     # más beams que esto con la misma llegada = RFI (veto)
+    ventana_s: 0.25                  # tolerancia de llegada para agrupar y vetar
+    accion: null                     # comando por alerta, con el JSON en la entrada estándar (p. ej. "cat >> /tmp/a.json")
+
+emisor:                              # puede correr en otro PC
+  set_dir: null      # null = $CHARTS_SET_DIR. Grupo 3: A_snr_fijo, B_amplitud_fija, negativos, parcial (manifest.csv + .fil)
+  sets: [A, B, NEG, P]
+  limite: null                       # primeros N archivos de cada set (null = todos)
+  prepad_s: 10
+  cola_s: 60
+  beams_con_datos: null              # null = todos; N = solo los primeros N leen .fil, el resto relleno
+  relleno: ruido                     # ruido | ceros
+  cuantizacion: fija                 # fija | por_canal (con RFI se usa por_canal)
+  mascara: null                      # p. ej. rfi_sitio/mascara_m1.npy
+  rfi:
+    activa: false                    # RFI del sitio (requiere rfi_sitio/modelo_rfi_sitio.npz)
+    umbral_lineas_db: 10
+    atenuacion_db: 0
+  ritmo: tiempo-real                 # tiempo-real | ack | libre
+  velocidad: 1.0
+  procesos: 8                        # procesos que preparan los bloques
+  gpu: false                         # cuantizar/inyectar con cupy
+  semilla: 1
+
+entornos:
+  pirate: null      # null = autodetectar: $CHARTS_PIRATE_ENV, el entorno activo o pirate_frb en el PATH. O una ruta fija

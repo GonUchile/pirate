@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+# datos y salidas: no van en git
+*.fil
+*.npz
+*.h5
+*.hdf5
+*.asdf
+*.npy
+!rfi_sitio/frecuencias_mhz.npy
+!rfi_sitio/mascara_m1.npy
+!rfi_sitio/mascara_m2.npy
+rfi_sitio/espectro_dinamico.npy
+rfi_sitio/modelo_rfi_sitio.npz
+rfi_sitio/fil/
+resultados/
+resultados_*/
+logs/
+ventanas/
+*.log
+tiempo_real/
+outputs*/
+_hechos.jsonl
+cuantizacion/plots_21504/
