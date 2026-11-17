@@ -8,12 +8,12 @@ __pycache__/
 *.hdf5
 *.asdf
 *.npy
-!site_rfi/frequencies_mhz.npy
-!site_rfi/mask_m1.npy
-!site_rfi/mask_m2.npy
-site_rfi/dynamic_spectrum.npy
-site_rfi/site_rfi_model.npz
-site_rfi/fil/
+!05_site_rfi/frequencies_mhz.npy
+!05_site_rfi/mask_m1.npy
+!05_site_rfi/mask_m2.npy
+05_site_rfi/dynamic_spectrum.npy
+05_site_rfi/site_rfi_model.npz
+05_site_rfi/fil/
 results/
 results_*/
 resultados/
@@ -25,4 +25,7 @@ dumps/
 tiempo_real/
 outputs*/
 _hechos.jsonl
-quantization/plots_21504/
+_done.jsonl
+02_quantization/plots_21504/
+05_site_rfi/figures_upchannelization/
+05_site_rfi/input_diagnostics.npz

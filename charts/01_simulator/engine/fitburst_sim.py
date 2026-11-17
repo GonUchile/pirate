@@ -1,34 +1,29 @@
 #!/usr/bin/env python3
 """
-Motor de simulación de FRBs sintéticos con Fitburst, según Fonseca et al.
+Synthetic FRB simulation engine with fitburst, following Fonseca et al.
 (2024) "Modeling the Morphology of Fast Radio Bursts and Radio Pulsars with
 fitburst" (ApJS 271:49, arXiv:2311.05829).
 
-No se ejecuta directamente para generar un catálogo -- para eso ver
-generar_simulaciones.py (que llama a generar_batch_desde_catalogo() de acá
-con los parámetros de banda/instrumento y la selección de FRBs que
-corresponda). Este archivo es el motor físico: dado DM/ancho/scattering/
-espectro/flujo de UN FRB, produce el .npz con la señal + ruido.
+The group-2 and group-3 generators only import the physical constants below
+(DM_CONST_SECONDS, DM_INDEX, SCATTERING_INDEX, REF_FREQ); the per-channel model
+is in 07_generate_comparison_set.py. generate_frb_fitburst() is the group-1
+engine: given the DM/width/scattering/spectrum/flux of ONE FRB, it produces a
+.npz with signal + noise using fitburst's SpectrumModeler.
 
-Requiere el paquete `fitburst` (pip install -e, ver
-https://github.com/CHIMEFRB/fitburst) instalado y disponible en el
-entorno -- sin necesidad de manipular sys.path si está instalado
-normalmente (pip install / pip install -e).
+Requires the `fitburst` package (https://github.com/CHIMEFRB/fitburst),
+installed normally (pip install / pip install -e).
 
-Física implementada:
-- amplitude=[0.0] (unitario) y escalado por flujo real (Sección 2.2)
-- dm_index=-2.0 (ley teórica plasma frío, Ecuación 5)
-- scattering_index=-4.0 (espectro de Kolmogorov, Ecuación 4)
-- ref_freq=400.1953125 MHz (borde inferior de la banda observada por
-  CHIME, 400-800 MHz) -- ver deteccion.py, misma referencia en todo el
-  pipeline
-- La constante de dispersión de fitburst (4149.377593360996) entrega el
-  delay DIRECTAMENTE EN SEGUNDOS (no en ms) -- ver fitburst/backend/general.yaml
-- Como ref_freq es el borde INFERIOR de la banda, es la frecuencia que
-  LLEGA AL FINAL (las frecuencias bajas se retrasan más) -- por eso
-  arrival_time (definido en ref_freq) se ubica cerca del final de la
-  ventana temporal, no al principio.
-- Ruido con ecuación del radiómetro: sigma = SEFD / sqrt(n_pol * Δν * τ)
+Physics:
+- amplitude=[0.0] (unit) and scaling by the real flux (Section 2.2)
+- dm_index=-2.0 (cold plasma law, Equation 5)
+- scattering_index=-4.0 (Kolmogorov spectrum, Equation 4)
+- ref_freq=400.1953125 MHz (bottom edge of the CHIME band, 400-800 MHz)
+- fitburst's dispersion constant (4149.377593360996) gives the delay
+  DIRECTLY IN SECONDS (not ms) -- see fitburst/backend/general.yaml
+- Since ref_freq is the BOTTOM edge of the band, it is the frequency that
+  ARRIVES LAST (low frequencies are delayed more), so arrival_time (defined
+  at ref_freq) sits near the end of the time window, not at the start.
+- Radiometer-equation noise: sigma = SEFD / sqrt(n_pol * Δν * τ)
 """
 import time as pytime
 from pathlib import Path
@@ -37,41 +32,37 @@ import numpy as np
 import fitburst as fb
 
 # ============================================================================
-# PARÁMETROS FÍSICOS FIJOS -- editar ACÁ, no en generar_frb_fitburst_paper().
-# Los usa todo el pipeline (01_/02_/03_/04_/05_ y engine/charts_sefd.py) vía
-# import desde este módulo, así que un cambio acá basta.
+# FIXED PHYSICAL PARAMETERS -- edit HERE. The whole pipeline imports them from
+# this module, so a change here is enough.
 #
-#   DM_CONST_SECONDS  Constante de dispersión del plasma frío (Ecuación 5,
-#                      Fonseca et al. 2024). Delay en SEGUNDOS (no ms) --
-#                      ver fitburst/backend/general.yaml. No tocar salvo que
-#                      cambie la propia constante de fitburst.
-#   DM_INDEX           Índice de la ley t(ν) ∝ DM·ν^dm_index. -2.0 es la ley
-#                      EXACTA de plasma frío no magnetizado -- no es un
-#                      parámetro libre por FRB. Se sobreescribe SOLO en
-#                      02_generar_negativos.py (a propósito, para generar
-#                      señales de control con índice inválido).
-#   SCATTERING_INDEX   Índice de la ley de scattering usada por fitburst:
-#                      τ(ν) = scattering_timescale · (ν/ref_freq)^scattering_index
-#                      (ver fitburst/analysis/model.py, compute_profile()).
-#                      -4.0 = espectro de Kolmogorov (Ecuación 4). Tampoco es
-#                      un parámetro libre por FRB.
-#   REF_FREQ            Frecuencia en la que fitburst define TODOS sus
-#                      parámetros dependientes de frecuencia (arrival_time,
-#                      scattering_timescale) -- ver fórmula de arriba, con
-#                      ν=ref_freq da scattering_timescale tal cual. Fija en
-#                      el borde inferior de la banda CHIME (400-800 MHz,
-#                      Fonseca et al. 2024) -- OJO: no es la banda CHARTS
-#                      simulada (300-501.6 MHz, ver CHARTS_FREQ_LO/HI en
-#                      01_/02_), es solo el ancla de definición de fitburst.
+#   DM_CONST_SECONDS  Cold-plasma dispersion constant (Equation 5, Fonseca et
+#                     al. 2024). Delay in SECONDS (not ms) -- see
+#                     fitburst/backend/general.yaml. Do not change unless
+#                     fitburst's own constant changes.
+#   DM_INDEX          Index of the law t(ν) ∝ DM·ν^dm_index. -2.0 is the EXACT
+#                     law of non-magnetized cold plasma -- not a free parameter
+#                     per FRB. It is overridden ONLY for the negatives (on
+#                     purpose, to generate control signals with an invalid index).
+#   SCATTERING_INDEX  Index of the scattering law used by fitburst:
+#                     τ(ν) = scattering_timescale · (ν/ref_freq)^scattering_index
+#                     (see fitburst/analysis/model.py, compute_profile()).
+#                     -4.0 = Kolmogorov spectrum (Equation 4). Not a free
+#                     parameter per FRB either.
+#   REF_FREQ          Frequency at which fitburst defines ALL its
+#                     frequency-dependent parameters (arrival_time,
+#                     scattering_timescale). Fixed at the bottom edge of the
+#                     CHIME band (400-800 MHz, Fonseca et al. 2024). NOTE: it is
+#                     not the simulated CHARTS band (300-501.6 MHz); it is only
+#                     fitburst's definition anchor.
 # ============================================================================
 DM_CONST_SECONDS = 4149.377593360996  # s * MHz^2 / (pc cm^-3) -- fitburst/backend/general.yaml
-DM_INDEX = -2.0          # FIJO: ley de plasma frío
-SCATTERING_INDEX = -4.0  # FIJO: espectro de Kolmogorov
-REF_FREQ = 400.1953125   # FIJO: Fonseca et al. (2024), borde inferior banda CHIME
+DM_INDEX = -2.0          # FIXED: cold plasma law
+SCATTERING_INDEX = -4.0  # FIXED: Kolmogorov spectrum
+REF_FREQ = 400.1953125   # FIXED: Fonseca et al. (2024), bottom edge of the CHIME band
 
-# SEFD por defecto si no se especifica uno (deriva de las specs de CHIME:
-# T_sys=50K, área física 8000 m², eficiencia de apertura supuesta 0.6 --
-# ver charts_sefd.py para el equivalente real de CHARTS).
+# Default SEFD if none is given (from the CHIME specifications: T_sys=50K,
+# physical area 8000 m², assumed aperture efficiency 0.6 -- see charts_sefd.py
+# for the actual CHARTS value).
 K_BOLTZMANN = 1.380649e-23      # J/K
 T_SYS_K = 50.0
 A_PHYSICAL_M2 = 8000.0
@@ -81,127 +72,120 @@ SEFD_JY_DEFAULT = 2.0 * K_BOLTZMANN * T_SYS_K / A_EFFECTIVE_M2 / 1e-26  # 1 Jy =
 
 
 def dispersion_delay(dm, freq_mhz, ref_freq=REF_FREQ, dm_index=DM_INDEX):
-    """Delay (segundos) de freq_mhz relativo a ref_freq. Fonseca Ecuación 5."""
+    """Delay (seconds) of freq_mhz relative to ref_freq. Fonseca Equation 5."""
     return dm * DM_CONST_SECONDS * (np.asarray(freq_mhz) ** dm_index - ref_freq ** dm_index)
 
 
-def generar_frb_fitburst_paper(
+def generate_frb_fitburst(
     frb_name, dm, width_fitb_s, scat_s_600mhz, sp_idx, sp_run, flux_jy,
     snr_target=None,
     freq_lo=REF_FREQ, freq_hi=800.0, num_freq=1024, res_time_ms=0.5,
     sefd_jy=None, n_pol=2.0, dm_index=DM_INDEX,
-    params_aproximados=None, output_dir=None, sin_ruido=False,
+    approximate_params=None, output_dir=None, noise_free=False,
 ):
     """
-    Genera un FRB sintético usando Fitburst.
+    Generates a synthetic FRB with fitburst.
 
-    Parámetros
+    Parameters
     ----------
     frb_name : str
     dm : float
-        Medida de Dispersión [pc/cm³]
+        Dispersion measure [pc/cm³]
     width_fitb_s : float
-        Ancho Gaussiano del pulso [s]
+        Gaussian width of the pulse [s]
     scat_s_600mhz : float
-        Scattering timescale a 600 MHz [s]
+        Scattering timescale at 600 MHz [s]
     sp_idx, sp_run : float
-        Índice espectral y corrimiento espectral (Ecuación 2)
+        Spectral index and spectral running (Equation 2)
     flux_jy : float
-        Flujo pico banda-promediado [Jy]
-    snr_target : float, opcional
-        Si se especifica, reescala la señal para alcanzar este SNR pico
+        Band-averaged peak flux [Jy]
+    snr_target : float, optional
+        If given, rescales the signal to reach this peak S/N
     freq_lo, freq_hi : float
-        Banda de frecuencia simulada [MHz]
+        Simulated frequency band [MHz]
     num_freq : int
-        Número de canales
+        Number of channels
     res_time_ms : float
-        Resolución temporal [ms]
-    sefd_jy : float, opcional
-        SEFD del instrumento [Jy]. None -> SEFD_JY_DEFAULT (CHIME aprox.).
-        Para CHARTS usar charts_sefd.CHARTS_SEFD_JY.
+        Time resolution [ms]
+    sefd_jy : float, optional
+        Instrument SEFD [Jy]. None -> SEFD_JY_DEFAULT (approx. CHIME).
+        For CHARTS use charts_sefd.CHARTS_SEFD_JY.
     n_pol : float
-        Polarizaciones sumadas en la ecuación del radiómetro. CHIME: 2.0
-        (default). CHARTS: 1.0 (charts_sefd.CHARTS_N_POL) -- una sola
-        polarización, Tabla 1 de Cassanelli et al. (2024).
-    dm_index : float, opcional
-        Índice de la ley de dispersión, t(ν) ∝ DM·ν^dm_index. FIJO en -2.0
-        para cualquier FRB real (plasma frío no magnetizado, Ecuación 5 de
-        Fonseca et al. 2024) -- no es un parámetro libre de ajuste
-        astrofísico. Existe como argumento acá específicamente para poder
-        generar señales de control "no-FRB" con un índice físicamente
-        inválido (ej. fuera de [1.8, 2.2]): como los 3 detectores
-        dedispersan asumiendo el índice estándar -2.0, una señal con índice
-        distinto nunca se compensa correctamente en ningún trial de DM que
-        prueben -- da una clase negativa genuina para medir especificidad
-        (ver comparacion_deteccion_chime/generar_negativos_dm_index.py).
-    params_aproximados : list[str], opcional
-        Nombres de parámetros que NO son medición real de este FRB (se
-        deja constancia en la metadata, no afecta el cómputo).
-    output_dir : str o Path, opcional
-        Carpeta de salida del .npz. Default: ./simulaciones/ relativo a
-        este archivo.
-    sin_ruido : bool, opcional
-        Si True, no se suma ruido del radiómetro -- data_full queda
-        idéntico a data_clean (señal pura). snr_peak/snr_integrated
-        quedan en inf (no hay piso de ruido contra el cual medir SNR).
-        Incompatible con snr_target (no tiene sentido reescalar a un SNR
-        objetivo si no hay ruido de referencia).
+        Polarizations summed in the radiometer equation. CHIME: 2.0
+        (default). CHARTS: 1.0 (charts_sefd.CHARTS_N_POL) -- a single
+        polarization, Table 1 of Cassanelli et al. (2024).
+    dm_index : float, optional
+        Index of the dispersion law, t(ν) ∝ DM·ν^dm_index. FIXED at -2.0
+        for any real FRB (non-magnetized cold plasma, Equation 5 of
+        Fonseca et al. 2024) -- not a free astrophysical parameter. It is an
+        argument only to generate "non-FRB" control signals with a physically
+        invalid index (e.g. outside [1.8, 2.2]): since the detectors dedisperse
+        assuming the standard index -2.0, a signal with a different index is
+        never compensated correctly at any DM trial -- a genuine negative class
+        to measure specificity.
+    approximate_params : list[str], optional
+        Names of parameters that are NOT a real measurement of this FRB (recorded
+        in the metadata; it does not affect the computation).
+    output_dir : str or Path, optional
+        Output folder of the .npz. Default: ./simulations/ relative to this file.
+    noise_free : bool, optional
+        If True, no radiometer noise is added -- data_full is identical to
+        data_clean (pure signal). snr_peak/snr_integrated are inf (there is no
+        noise floor to measure S/N against). Incompatible with snr_target.
 
     Returns
     -------
-    dict con filename, path, shape, snr_peak, snr_integrated, dm, flux_jy.
+    dict with filename, path, shape, snr_peak, snr_integrated, dm, flux_jy.
     """
-    print(f"\n{'='*80}\nGENERADOR FRB - FITBURST (Fonseca et al. 2024)\n{'='*80}")
-    print(f"FRB: {frb_name} | DM: {dm:.2f} pc/cm³ | flujo: {flux_jy:.2f} Jy | "
+    print(f"\n{'='*80}\nFRB GENERATOR - FITBURST (Fonseca et al. 2024)\n{'='*80}")
+    print(f"FRB: {frb_name} | DM: {dm:.2f} pc/cm³ | flux: {flux_jy:.2f} Jy | "
           f"sp_idx: {sp_idx:.2f} | sp_run: {sp_run:.2f}")
-    if params_aproximados:
-        print(f"  ⚠ APROXIMADOS (mediana del catálogo, no medidos para este FRB): "
-              f"{', '.join(params_aproximados)}")
+    if approximate_params:
+        print(f"  ⚠ APPROXIMATE (catalog median, not measured for this FRB): "
+              f"{', '.join(approximate_params)}")
 
-    # ---- Banda, sweep de dispersión y ventana temporal ----
+    # ---- Band, dispersion sweep and time window ----
     res_freq_mhz = (freq_hi - freq_lo) / (num_freq - 1)
     freqs = np.linspace(freq_lo, freq_hi, num_freq)
     res_time = res_time_ms / 1000.0
 
-    # Frecuencias MENORES que ref_freq tienen delay POSITIVO (llegan
-    # después); MAYORES tienen delay NEGATIVO (llegan antes). Válido tanto
-    # si ref_freq está en el borde de la banda como si queda dentro de ella
-    # (p.ej. al extender la banda observada hacia frecuencias más bajas).
+    # Frequencies BELOW ref_freq have a POSITIVE delay (they arrive later);
+    # ABOVE, a NEGATIVE delay (they arrive earlier). Valid whether ref_freq
+    # is at the edge of the band or inside it (e.g. when the observed band
+    # extends to lower frequencies).
     delay_lo = dispersion_delay(dm, freq_lo, ref_freq=REF_FREQ, dm_index=dm_index)
     delay_hi = dispersion_delay(dm, freq_hi, ref_freq=REF_FREQ, dm_index=dm_index)
-    sweep_s = delay_lo - delay_hi  # siempre positivo (freq_hi llega antes que freq_lo)
+    sweep_s = delay_lo - delay_hi  # always positive (freq_hi arrives before freq_lo)
 
     margin_start = max(5.0 * width_fitb_s, 0.005)
     margin_end = max(5.0 * max(width_fitb_s, scat_s_600mhz), 0.01)
 
-    # arrival_time se define EN ref_freq. Se ubica de modo que freq_hi (la
-    # que llega primero) caiga justo en margin_start:
+    # arrival_time is defined AT ref_freq. It is placed so that freq_hi (the
+    # first to arrive) falls exactly at margin_start:
     #   t_peak(freq_hi) = margin_start  =>  arrival_time = margin_start - delay_hi
     arrival_time = margin_start - delay_hi
     total_duration = margin_start + sweep_s + margin_end
     num_time = int(np.ceil(total_duration / res_time))
     times = np.arange(num_time) * res_time
 
-    print(f"  Banda: {freq_lo:.4f}-{freq_hi:.4f} MHz, {num_freq} canales, "
-          f"{res_freq_mhz*1000:.2f} kHz/canal")
-    print(f"  Sweep de dispersión: {sweep_s:.4f} s | ventana total: {total_duration:.4f} s "
-          f"({num_time} muestras @ {res_time*1000:.3f} ms)")
+    print(f"  Band: {freq_lo:.4f}-{freq_hi:.4f} MHz, {num_freq} channels, "
+          f"{res_freq_mhz*1000:.2f} kHz/channel")
+    print(f"  Dispersion sweep: {sweep_s:.4f} s | total window: {total_duration:.4f} s "
+          f"({num_time} samples @ {res_time*1000:.3f} ms)")
 
-    # ---- Parámetros Fitburst ----
-    # fitburst define scattering_timescale EN ref_freq y escala a cualquier
-    # frecuencia como sc_time(ν) = scattering_timescale * (ν/ref_freq)**SCATTERING_INDEX
-    # (fitburst/analysis/model.py, compute_profile()). scat_s_600mhz es el
-    # valor medido en el catálogo A 600 MHz, así que para recuperar
-    # scattering_timescale hay que invertir esa misma fórmula evaluada en
-    # ν=600: scat_s_600mhz = scattering_timescale * (600/ref_freq)**SCATTERING_INDEX
+    # ---- fitburst parameters ----
+    # fitburst defines scattering_timescale AT ref_freq and scales it to any
+    # frequency as sc_time(ν) = scattering_timescale * (ν/ref_freq)**SCATTERING_INDEX
+    # (fitburst/analysis/model.py, compute_profile()). scat_s_600mhz is the
+    # value measured in the catalog AT 600 MHz, so to recover
+    # scattering_timescale that same formula is inverted at ν=600:
+    #   scat_s_600mhz = scattering_timescale * (600/ref_freq)**SCATTERING_INDEX
     #   => scattering_timescale = scat_s_600mhz * (600/ref_freq)**(-SCATTERING_INDEX)
-    # OJO: el exponente es -SCATTERING_INDEX (+4), NO SCATTERING_INDEX (-4) --
-    # con el signo de SCATTERING_INDEX directo (bug corregido acá, hasta
-    # 2026-09-10) el scattering quedaba subestimado ~25x en toda la banda
-    # CHARTS (verificado contra fitburst/analysis/model.py:359). Si tocás
-    # esto, actualizá también 02_generar_negativos.py, que hace la
-    # conversión inversa para preservar el scattering del positivo de
-    # origen y depende del mismo signo.
+    # NOTE: the exponent is -SCATTERING_INDEX (+4), NOT SCATTERING_INDEX (-4).
+    # With the sign of SCATTERING_INDEX used directly (bug fixed here on
+    # 2026-09-10) the scattering was underestimated ~25x over the whole CHARTS
+    # band (checked against fitburst/analysis/model.py:359). The negatives
+    # generator does the inverse conversion and depends on the same sign.
     scattering_timescale = scat_s_600mhz * (600.0 / REF_FREQ) ** (-SCATTERING_INDEX)
     params = {
         "amplitude": [0.0],
@@ -216,47 +200,47 @@ def generar_frb_fitburst_paper(
         "spectral_running": [sp_run],
     }
 
-    # ---- Modelo unitario ----
+    # ---- Unit model ----
     modeler = fb.analysis.model.SpectrumModeler(
         freqs, times, num_components=1, is_dedispersed=False, verbose=False,
     )
     modeler.update_parameters(params)
     t0 = pytime.time()
     unit_model = modeler.compute_model().astype(np.float32)
-    print(f"  ✓ Modelo generado en {pytime.time()-t0:.2f} s | shape {unit_model.shape} (freq×time)")
+    print(f"  ✓ Model generated in {pytime.time()-t0:.2f} s | shape {unit_model.shape} (freq×time)")
 
     n_nonzero = int((unit_model.max(axis=1) > 0).sum())
     if n_nonzero < num_freq:
-        print(f"  ⚠ {num_freq - n_nonzero} canales sin señal detectable -- revisar ventana/arrival_time")
+        print(f"  ⚠ {num_freq - n_nonzero} channels without detectable signal -- check window/arrival_time")
 
-    # ---- Calibrar por flujo real (Sección 2.2 del paper) ----
-    # El flujo del catálogo es banda-promedio en la banda REAL de CHIME
-    # (400-800 MHz). Si la banda simulada se extiende por debajo de 400 MHz,
-    # esos canales extra NO deben entrar en el promedio de calibración.
+    # ---- Calibrate with the real flux (Section 2.2 of the paper) ----
+    # The catalog flux is the band average over the REAL CHIME band
+    # (400-800 MHz). If the simulated band extends below 400 MHz, those extra
+    # channels must NOT enter the calibration average.
     chime_mask = (freqs >= 400.0) & (freqs <= 800.0)
     band_avg_profile = unit_model[chime_mask].mean(axis=0) if chime_mask.any() else unit_model.mean(axis=0)
     peak_unit = float(band_avg_profile.max())
     scale = flux_jy / peak_unit if peak_unit > 0 else 1.0
     signal_jy = (unit_model * scale).astype(np.float32)
 
-    # ---- Ruido (ecuación del radiómetro) ----
+    # ---- Noise (radiometer equation) ----
     if sefd_jy is None:
         sefd_jy = SEFD_JY_DEFAULT
-        print(f"  SEFD por defecto (aprox. CHIME): {sefd_jy:.2f} Jy")
+        print(f"  Default SEFD (approx. CHIME): {sefd_jy:.2f} Jy")
 
     delta_nu_hz = res_freq_mhz * 1e6
     noise_std = sefd_jy / np.sqrt(n_pol * delta_nu_hz * res_time)
 
-    if sin_ruido:
+    if noise_free:
         if snr_target is not None:
-            raise ValueError("snr_target no tiene sentido con sin_ruido=True "
-                              "(no hay piso de ruido contra el cual reescalar)")
+            raise ValueError("snr_target makes no sense with noise_free=True "
+                             "(there is no noise floor to rescale against)")
         noise_jy = np.zeros_like(signal_jy)
         data_full = signal_jy.copy()
         snr_peak = float("inf")
         snr_integrated = float("inf")
-        print(f"  SIN RUIDO (sefd_jy={sefd_jy:.2f} Jy calculado pero no aplicado) "
-              f"-> SNR pico/integrada = inf")
+        print(f"  NOISE-FREE (sefd_jy={sefd_jy:.2f} Jy computed but not applied) "
+              f"-> peak/integrated S/N = inf")
     else:
         rng = np.random.default_rng()
         noise_jy = rng.normal(0, noise_std, signal_jy.shape).astype(np.float32)
@@ -266,8 +250,8 @@ def generar_frb_fitburst_paper(
         band_avg_signal = signal_jy.mean(axis=0)
         noise_band_avg_std = noise_std / np.sqrt(num_freq)
         snr_integrated = float(band_avg_signal.max() / noise_band_avg_std)
-        print(f"  SEFD={sefd_jy:.2f} Jy, n_pol={n_pol:.0f} | SNR pico={snr_peak:.2f}, "
-              f"SNR integrada={snr_integrated:.2f}")
+        print(f"  SEFD={sefd_jy:.2f} Jy, n_pol={n_pol:.0f} | peak S/N={snr_peak:.2f}, "
+              f"integrated S/N={snr_integrated:.2f}")
 
         if snr_target is not None:
             factor = snr_target / snr_peak
@@ -275,7 +259,7 @@ def generar_frb_fitburst_paper(
             data_full = (signal_jy + noise_jy).astype(np.float32)
             snr_peak = snr_target
             snr_integrated *= factor
-            print(f"  -> Reescalado a SNR objetivo {snr_target:.1f} (factor {factor:.3f})")
+            print(f"  -> Rescaled to target S/N {snr_target:.1f} (factor {factor:.3f})")
 
     metadata = {
         "bad_chans": [], "freqs_bin0": float(freqs[0]), "is_dedispersed": False,
@@ -283,7 +267,7 @@ def generar_frb_fitburst_paper(
         "res_freq": float(res_freq_mhz), "res_time": res_time,
         "dm_const_seconds": DM_CONST_SECONDS, "ref_freq": REF_FREQ,
         "dm_index": dm_index, "scattering_index": SCATTERING_INDEX,
-        "sweep_s": sweep_s, "sefd_jy": sefd_jy, "n_pol": n_pol, "sin_ruido": sin_ruido,
+        "sweep_s": sweep_s, "sefd_jy": sefd_jy, "n_pol": n_pol, "noise_free": noise_free,
     }
     burst_parameters = {
         "amplitude": [0.0], "arrival_time": [arrival_time], "burst_width": [width_fitb_s],
@@ -295,16 +279,16 @@ def generar_frb_fitburst_paper(
         "frb_source": frb_name,
         "paper": "Fonseca et al. (2024) ApJS 271:49",
         "doi": "10.3847/1538-4365/ad27d6", "arxiv": "2311.05829",
-        "params_aproximados": params_aproximados or [],
+        "approximate_params": approximate_params or [],
     }
 
     fname = f"{frb_name}_dm{dm:07.2f}_fitburst.npz"
-    sim_dir = Path(output_dir) if output_dir is not None else Path(__file__).resolve().parent / "simulaciones"
+    sim_dir = Path(output_dir) if output_dir is not None else Path(__file__).resolve().parent / "simulations"
     sim_dir.mkdir(parents=True, exist_ok=True)
     npz_path = sim_dir / fname
     np.savez_compressed(npz_path, data_full=data_full, data_clean=signal_jy,
                          metadata=metadata, burst_parameters=burst_parameters)
-    print(f"  ✓ Guardado: {npz_path} ({npz_path.stat().st_size/1024/1024:.1f} MB)")
+    print(f"  ✓ Saved: {npz_path} ({npz_path.stat().st_size/1024/1024:.1f} MB)")
 
     return {
         "filename": fname, "path": npz_path, "shape": data_full.shape,
@@ -313,50 +297,48 @@ def generar_frb_fitburst_paper(
     }
 
 
-def generar_batch_desde_catalogo(nombres_frb, catalogo_normalizado, **kwargs_comunes):
+def generate_batch_from_catalog(frb_names, normalized_catalog, **common_kwargs):
     """
-    Genera simulaciones para una lista de FRBs, tomando sus parámetros de un
-    catálogo ya cargado con catalogo.cargar_catalogo() -- funciona igual
-    para catalog1 o catalog2 (o cualquier catálogo nuevo agregado en
-    catalogo.py), porque ese módulo ya normalizó los nombres de columna.
+    Generates simulations for a list of FRBs, taking their parameters from a catalog
+    already loaded as a dict {name: row} with normalized column names
+    (dm, flux_jy, sp_idx, sp_run, width_s, scat_s).
 
-    Parámetros
+    Parameters
     ----------
-    nombres_frb : list[str]
-        Nombres a simular (deben existir como claves de catalogo_normalizado)
-    catalogo_normalizado : dict
-        Como el que devuelve catalogo.cargar_catalogo()
-    **kwargs_comunes
-        Parámetros compartidos por todas las simulaciones (freq_lo, freq_hi,
-        num_freq, res_time_ms, sefd_jy, n_pol, output_dir, etc.)
+    frb_names : list[str]
+        Names to simulate (they must be keys of normalized_catalog)
+    normalized_catalog : dict
+    **common_kwargs
+        Parameters shared by all simulations (freq_lo, freq_hi, num_freq,
+        res_time_ms, sefd_jy, n_pol, output_dir, etc.)
     """
-    resultados = []
-    faltantes = [n for n in nombres_frb if n not in catalogo_normalizado]
-    if faltantes:
-        print(f"⚠ No encontrados en el catálogo: {faltantes}")
+    results = []
+    missing = [n for n in frb_names if n not in normalized_catalog]
+    if missing:
+        print(f"⚠ Not found in the catalog: {missing}")
 
-    for nombre in nombres_frb:
-        if nombre not in catalogo_normalizado:
+    for name in frb_names:
+        if name not in normalized_catalog:
             continue
-        row = catalogo_normalizado[nombre]
+        row = normalized_catalog[name]
         if row["dm"] is None or row["flux_jy"] is None or row["sp_idx"] is None or row["sp_run"] is None:
-            print(f"⚠ {nombre}: faltan parámetros obligatorios (dm/flux_jy/sp_idx/sp_run) -- omitido")
+            print(f"⚠ {name}: required parameters missing (dm/flux_jy/sp_idx/sp_run) -- skipped")
             continue
-        resultado = generar_frb_fitburst_paper(
-            frb_name=nombre,
+        result = generate_frb_fitburst(
+            frb_name=name,
             dm=row["dm"],
             width_fitb_s=row["width_s"] if row["width_s"] is not None else 0.001,
             scat_s_600mhz=row["scat_s"] or 0.0,
             sp_idx=row["sp_idx"],
             sp_run=row["sp_run"],
             flux_jy=row["flux_jy"],
-            **kwargs_comunes,
+            **common_kwargs,
         )
-        resultados.append(resultado)
+        results.append(result)
 
-    print(f"\n{'='*80}\nRESUMEN DEL BATCH ({len(resultados)}/{len(nombres_frb)} generados)\n{'='*80}")
-    for r in resultados:
-        print(f"  {r['dm']:8.2f} pc/cm³ | SNR pico={r['snr_peak']:8.1f} | "
-              f"SNR integrada={r['snr_integrated']:6.1f} | {r['filename']}")
+    print(f"\n{'='*80}\nBATCH SUMMARY ({len(results)}/{len(frb_names)} generated)\n{'='*80}")
+    for r in results:
+        print(f"  {r['dm']:8.2f} pc/cm³ | peak S/N={r['snr_peak']:8.1f} | "
+              f"integrated S/N={r['snr_integrated']:6.1f} | {r['filename']}")
 
-    return resultados
+    return results

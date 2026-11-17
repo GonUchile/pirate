@@ -12,7 +12,7 @@ Generates the 4000 `.fil` files used in the 64-beam test: 1000 per set.
 The folder names (and the `manifest.csv` columns) are the ones the generator writes; they are kept unchanged so that
 the existing dataset remains readable and the generator reproduces it byte for byte.
 
-Physics (from `07_generate_comparison_set.py`, function `modelo()`): gaussian pulse with energy-conserving
+Physics (from `07_generate_comparison_set.py`, function `model()`): gaussian pulse with energy-conserving
 scattering, spectrum taken from real bursts in the CHIME catalog (shapes from `catalogs/`), dispersion with smearing
 within each channel and ×4 oversampling. Noise of 256 antennas (SEFD from `engine/charts_sefd.py`). DM uniform between
 100 and 3000. No RFI (the RFI is added when emitting, see `05_site_rfi/`).
@@ -25,7 +25,7 @@ parameters of each file and `t_top_s` = arrival at 501.6 MHz.
 
 | File | What it does |
 |---|---|
-| `12_generate_comparison_set_21504.py` | **The group-3 generator.** Resumable (`_hechos.jsonl`), parallel |
+| `12_generate_comparison_set_21504.py` | **The group-3 generator.** Resumable (`_done.jsonl`), parallel |
 | `07_generate_comparison_set.py` | Pulse physics and utilities; also generates group 2 (672 channels) |
 | `03_convert_to_fil.py` | Writing the `.fil` files and the 8-bit scale |
 | `engine/charts_sefd.py`, `engine/fitburst_sim.py` | CHARTS SEFD and fitburst constants/pulse shape |

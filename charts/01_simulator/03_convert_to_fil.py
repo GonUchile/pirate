@@ -1,30 +1,23 @@
 #!/usr/bin/env python3
 """
-Convierte los .npz (positivos y negativos) a .fil (filterbank SIGPROC),
-listos para alimentar Heimdall/PRESTO/AstroAccelerate.
+SIGPROC .fil writer (write_fil) used by the group-2 and group-3 generators, and converter of the
+group-1 .npz files (positives and negatives) to .fil, ready for Heimdall/PRESTO/AstroAccelerate.
 
-Reescribe a mano el header SIGPROC (formato con prefijo de longitud por
-etiqueta) -- no depende de sigpyproc. Idéntico en lógica a
-2 npz_to_fil/batch_npz_to_fil.py + comparacion_deteccion_chime/
-convertir_negativos_a_fil.py del proyecto original: rellena con ruido
-gaussiano (estadística robusta por canal, mediana/MAD) a ambos lados del
-burst para que una búsqueda ciega de DM hasta DM_SEARCH_MAX no lo pierda
-en los bordes.
+Writes the SIGPROC header by hand (length-prefixed labels) -- it does not depend on sigpyproc.
+For the .npz conversion it pads with gaussian noise (robust per-channel statistics, median/MAD) on
+both sides of the burst, so that a blind DM search up to DM_SEARCH_MAX does not lose it at the edges.
 
-Requiere haber corrido antes 01_generar_positivos.py y (opcional)
-02_generar_negativos.py -- o, si se quiere convertir la versión con RFI
-real, 04_agregar_rfi_real.py (usar --positivos-dir/--negativos-dir para
-apuntar a outputs/positivos_con_rfi, outputs/negativos_con_rfi).
+The .npz inputs come from the group-1 generators (not included in this repository). The input and
+output file and column names are those of the existing group-1 dataset and are kept unchanged.
 
-Salida (nombre de carpeta de salida = nombre de la carpeta de entrada +
-"_fil", ej. positivos -> positivos_fil, positivos_con_rfi -> positivos_con_rfi_fil):
-  outputs/<positivos-dir>_fil/<catalogo>/*.fil, .../manifest.csv
-  outputs/<negativos-dir>_fil/*.fil,            .../manifest.csv
+Output (output folder name = input folder name + "_fil", e.g. positivos -> positivos_fil):
+  outputs/<positives-dir>_fil/<catalogo>/*.fil, .../manifest.csv
+  outputs/<negatives-dir>_fil/*.fil,            .../manifest.csv
 
-Uso:
-  python 03_convert_to_fil.py [--limit N] [--nbits 8] [--skip-negativos]
-                                [--positivos-dir outputs/positivos]
-                                [--negativos-dir outputs/negativos]
+Usage:
+  python 03_convert_to_fil.py [--limit N] [--nbits 8] [--skip-negatives]
+                              [--positives-dir outputs/positivos]
+                              [--negatives-dir outputs/negativos]
 """
 import argparse
 import csv
@@ -37,38 +30,35 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / "engine"))
 
-from charts_sefd import noise_std_teorico  # noqa: E402
+from charts_sefd import theoretical_noise_std  # noqa: E402
 
-N_SIGMA_CLIP = 5.0  # ver 06_fil_con_rfi.py -- misma referencia (sigma teorico de CHARTS)
+N_SIGMA_CLIP = 5.0  # in units of the theoretical CHARTS noise sigma
 
-# Ventana de búsqueda de DM fija para las herramientas de detección (mismo
-# criterio que el proyecto original: "DM desde 20 a 1000, eso para
-# todos"). PAD_GUARD_SAMPLES=10000 porque prepsubband (PRESTO) redondea su
-# longitud de salida hacia arriba (FFT-friendly) antes de calcular cuántas
-# muestras son válidas -- con guard chico eso puede vaciar el archivo
-# entero para bursts de ventana corta (ver REPORTE_CORRIDA.md del proyecto
-# original, confirmado en 27/2839 archivos).
+# Fixed DM search window for the detection tools (group 1: "DM from 20 to 1000
+# for all"). PAD_GUARD_SAMPLES=10000 because prepsubband (PRESTO) rounds its
+# output length up (FFT-friendly) before computing how many samples are valid --
+# with a small guard that can empty the whole file for bursts with a short
+# window (confirmed in 27/2839 files).
 DM_SEARCH_MIN = 20.0
 DM_SEARCH_MAX = 1000.0
 PAD_GUARD_SAMPLES = 10000
 
 
-def write_fil(data_full, freqs, times, out_path, nbits=8, source_name="FRB", escala_fija=None):
+def write_fil(data_full, freqs, times, out_path, nbits=8, source_name="FRB", fixed_scale=None):
     data = np.asarray(data_full, dtype=np.float64)
 
-    if nbits in (8, 16) and escala_fija is not None:
-        # Escala FIJA, anclada al sigma TEORICO del ruido de sistema
-        # (ecuacion del radiometro, ver engine/charts_sefd.py::noise_std_teorico)
-        # -- no minimo/maximo GLOBAL de este archivo en particular. Con
-        # minimo/maximo por archivo, el pico del burst domina el rango y
-        # aplasta el piso de ruido a una fraccion distinta de 0-255 en cada
-        # archivo segun que tan brillante sea su burst (confirmado
-        # 2026-08-30: piso en 130/255 para SNR=0.03 vs 9/255 para SNR=6.20,
-        # mismo instrumento, mismo ruido fisico) -- con escala fija el piso
-        # se ve igual en todos los archivos, y ya no depende de cuan
-        # brillante sea el burst de ESE archivo en particular.
-        centro, medio_ancho = escala_fija
-        lo, hi = centro - medio_ancho, centro + medio_ancho
+    if nbits in (8, 16) and fixed_scale is not None:
+        # FIXED scale, anchored to the THEORETICAL system noise sigma
+        # (radiometer equation, see engine/charts_sefd.py::theoretical_noise_std),
+        # not the GLOBAL minimum/maximum of this particular file. With a
+        # per-file minimum/maximum the burst peak dominates the range and
+        # squeezes the noise floor to a different fraction of 0-255 in each
+        # file depending on how bright its burst is (confirmed 2026-08-30:
+        # floor at 130/255 for S/N=0.03 vs 9/255 for S/N=6.20, same instrument,
+        # same physical noise). With a fixed scale the floor looks the same in
+        # every file.
+        centre, half_width = fixed_scale
+        lo, hi = centre - half_width, centre + half_width
         norm01 = np.clip((data - lo) / (hi - lo), 0.0, 1.0)
         if nbits == 8:
             norm = (norm01 * 255).astype(np.uint8)
@@ -85,9 +75,9 @@ def write_fil(data_full, freqs, times, out_path, nbits=8, source_name="FRB", esc
     elif nbits == 32:
         norm = data.astype(np.float32)
     else:
-        raise ValueError(f"nbits={nbits} no soportado")
+        raise ValueError(f"nbits={nbits} not supported")
 
-    # SIGPROC: frecuencias descendentes, filas = muestras de tiempo
+    # SIGPROC: descending frequencies, rows = time samples
     data_fil = norm[::-1, :].T.copy()
 
     tsamp = float(times[1] - times[0])
@@ -206,23 +196,23 @@ def convert_one(npz_path, out_path, nbits, name):
     num_time_padded = data_padded.shape[1]
     times_padded = np.arange(num_time_padded) * tsamp
 
-    sigma_teo = noise_std_teorico(meta)
-    escala_fija = (0.0, N_SIGMA_CLIP * sigma_teo)  # sin RFI: un solo sigma, uniforme entre canales
+    sigma_theo = theoretical_noise_std(meta)
+    fixed_scale = (0.0, N_SIGMA_CLIP * sigma_theo)  # no RFI: a single sigma, uniform across channels
     size = write_fil(data_padded, freqs, times_padded, out_path, nbits=nbits, source_name=name,
-                      escala_fija=escala_fija)
+                     fixed_scale=fixed_scale)
     info["fil_size_bytes"] = size
-    info["cuantizacion_sigma_teo_jy"] = sigma_teo
+    info["cuantizacion_sigma_teo_jy"] = sigma_theo
     info["cuantizacion_n_sigma"] = N_SIGMA_CLIP
     return info
 
 
-def convertir_positivos(nbits, limit, src_root, out_dir):
-    resumen_csv = src_root / "frb_simulados_resumen.csv"
+def convert_positives(nbits, limit, src_root, out_dir):
+    summary_csv = src_root / "frb_simulados_resumen.csv"
     manifest_csv = out_dir / "manifest.csv"
-    if not resumen_csv.exists():
-        print(f"  (omitido: no existe {resumen_csv})")
+    if not summary_csv.exists():
+        print(f"  (skipped: {summary_csv} does not exist)")
         return
-    with open(resumen_csv) as f:
+    with open(summary_csv) as f:
         rows = list(csv.DictReader(f))
     if limit:
         rows = rows[:limit]
@@ -232,20 +222,20 @@ def convertir_positivos(nbits, limit, src_root, out_dir):
     n_ok, n_err = 0, 0
     for i, row in enumerate(rows, 1):
         name = row["name"]
-        catalogo = row["catalogo"]
+        catalog = row["catalogo"]
         npz_path = src_root / row["npz_path"]
-        out_path = out_dir / catalogo / f"{catalogo}_{name}.fil"
+        out_path = out_dir / catalog / f"{catalog}_{name}.fil"
         try:
             info = convert_one(npz_path, out_path, nbits, name)
             n_ok += 1
             if n_ok % 100 == 0:
-                print(f"  [positivos {i}/{len(rows)}] convertidos={n_ok} errores={n_err}", flush=True)
+                print(f"  [positives {i}/{len(rows)}] converted={n_ok} errors={n_err}", flush=True)
         except Exception as e:
-            print(f"  [positivos {i}/{len(rows)}] ERROR {name}: {e}", file=sys.stderr)
+            print(f"  [positives {i}/{len(rows)}] ERROR {name}: {e}", file=sys.stderr)
             n_err += 1
             continue
         manifest_rows.append({
-            "name": name, "catalogo": catalogo, "fil_path": str(out_path), "npz_path": str(npz_path),
+            "name": name, "catalogo": catalog, "fil_path": str(out_path), "npz_path": str(npz_path),
             "dm_truth": info["dm_truth"], "arrival_time_in_fil_s": info["arrival_time_in_fil_s"],
             "pad_samples_before": info["pad_samples_before"], "burst_width_s": info["burst_width_s"],
             "snr_peak_truth": info["snr_peak_truth"], "snr_integrated_truth": info["snr_integrated_truth"],
@@ -259,14 +249,14 @@ def convertir_positivos(nbits, limit, src_root, out_dir):
             w = csv.DictWriter(f, fieldnames=list(manifest_rows[0].keys()))
             w.writeheader()
             w.writerows(manifest_rows)
-    print(f"✓ Positivos: {n_ok} convertidos, {n_err} errores -> {manifest_csv}")
+    print(f"✓ Positives: {n_ok} converted, {n_err} errors -> {manifest_csv}")
 
 
-def convertir_negativos(nbits, limit, src_root, out_dir):
+def convert_negatives(nbits, limit, src_root, out_dir):
     manifest_in = src_root / "manifest_negativos.csv"
     manifest_csv = out_dir / "manifest.csv"
     if not manifest_in.exists():
-        print(f"  (omitido: no existe {manifest_in} -- corré 02_generar_negativos.py primero)")
+        print(f"  (skipped: {manifest_in} does not exist; it is written by the group-1 negatives generator)")
         return
     with open(manifest_in) as f:
         rows = list(csv.DictReader(f))
@@ -284,9 +274,9 @@ def convertir_negativos(nbits, limit, src_root, out_dir):
             info = convert_one(npz_path, out_path, nbits, name)
             n_ok += 1
             if n_ok % 100 == 0:
-                print(f"  [negativos {i}/{len(rows)}] convertidos={n_ok} errores={n_err}", flush=True)
+                print(f"  [negatives {i}/{len(rows)}] converted={n_ok} errors={n_err}", flush=True)
         except Exception as e:
-            print(f"  [negativos {i}/{len(rows)}] ERROR {name}: {e}", file=sys.stderr)
+            print(f"  [negatives {i}/{len(rows)}] ERROR {name}: {e}", file=sys.stderr)
             n_err += 1
             continue
         manifest_rows.append({
@@ -305,31 +295,31 @@ def convertir_negativos(nbits, limit, src_root, out_dir):
             w = csv.DictWriter(f, fieldnames=list(manifest_rows[0].keys()))
             w.writeheader()
             w.writerows(manifest_rows)
-    print(f"✓ Negativos: {n_ok} convertidos, {n_err} errores -> {manifest_csv}")
+    print(f"✓ Negatives: {n_ok} converted, {n_err} errors -> {manifest_csv}")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--nbits", type=int, default=8)
-    ap.add_argument("--skip-negativos", action="store_true")
-    ap.add_argument("--positivos-dir", type=Path, default=HERE / "outputs" / "positivos",
-                     help="Carpeta con frb_simulados_resumen.csv (salida de 01_ o 04_). "
-                          "Default: outputs/positivos")
-    ap.add_argument("--negativos-dir", type=Path, default=HERE / "outputs" / "negativos",
-                     help="Carpeta con manifest_negativos.csv (salida de 02_ o 04_). "
-                          "Default: outputs/negativos")
+    ap.add_argument("--skip-negatives", action="store_true")
+    ap.add_argument("--positives-dir", type=Path, default=HERE / "outputs" / "positivos",
+                    help="Folder with frb_simulados_resumen.csv (group-1 positives). "
+                         "Default: outputs/positivos")
+    ap.add_argument("--negatives-dir", type=Path, default=HERE / "outputs" / "negativos",
+                    help="Folder with manifest_negativos.csv (group-1 negatives). "
+                         "Default: outputs/negativos")
     args = ap.parse_args()
 
-    pos_out_dir = args.positivos_dir.parent / f"{args.positivos_dir.name}_fil"
-    neg_out_dir = args.negativos_dir.parent / f"{args.negativos_dir.name}_fil"
+    pos_out_dir = args.positives_dir.parent / f"{args.positives_dir.name}_fil"
+    neg_out_dir = args.negatives_dir.parent / f"{args.negatives_dir.name}_fil"
 
-    print("Convirtiendo positivos...")
-    convertir_positivos(args.nbits, args.limit, args.positivos_dir, pos_out_dir)
+    print("Converting positives...")
+    convert_positives(args.nbits, args.limit, args.positives_dir, pos_out_dir)
 
-    if not args.skip_negativos:
-        print("\nConvirtiendo negativos...")
-        convertir_negativos(args.nbits, args.limit, args.negativos_dir, neg_out_dir)
+    if not args.skip_negatives:
+        print("\nConverting negatives...")
+        convert_negatives(args.nbits, args.limit, args.negatives_dir, neg_out_dir)
 
 
 if __name__ == "__main__":

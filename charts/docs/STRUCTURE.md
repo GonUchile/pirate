@@ -67,6 +67,7 @@ All of them read a run folder (the one the launcher leaves) and write their tabl
 | `10_rfi_analysis/compare_diag.py` | Grouper and mask variants, with correction for chance hits |
 | `10_rfi_analysis/analyze_full_runs.py` | Full runs with mask: recall, FA and chance hits |
 | `10_rfi_analysis/process_monitor.py` | Logs per-process resources every 5 s during a run |
+| `10_rfi_analysis/_common.py` | Helpers shared by the three analyses above (finding runs, re-running the evaluator) |
 
 Variables: `CHARTS_RUN` (default run of `map_statistics/`), `CHARTS_ANALYSIS_OUT` (where they write),
 `CHARTS_SUBBAND_RESULTS` and `CHARTS_RFI_RESULTS` (folders with several runs to compare). The `10_rfi_analysis/` scripts

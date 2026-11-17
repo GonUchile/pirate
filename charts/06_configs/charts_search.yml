@@ -1,7 +1,7 @@
-# Config de búsqueda offline CHARTS para pirate_fil_search.py.
-# Banda, canales y tsamp se sobreescriben con el header del .fil.
-# Rank 16 => árbol 0: DM 0-~2200 (boxcar <= 32 muestras); árbol 1 (x2 en tiempo): DM ~2200-~4400 (boxcar <= 16x2 = 32 ms).
-# Sin subbandas: usa kernels "production" ya compilados.
+# CHARTS offline search config for 03_offline_search/pirate_fil_search.py.
+# Band, channels and tsamp are overwritten with the .fil header.
+# Rank 16 => tree 0: DM 0-~2200 (boxcar <= 32 samples); tree 1 (x2 in time): DM ~2200-~4400 (boxcar <= 16x2 = 32 ms).
+# No subbands: uses the already compiled "production" kernels.
 zone_freq_edges: [300, 501.6]
 zone_nfreq: [672]
 time_sample_ms: 1.0

@@ -130,7 +130,7 @@ Implemented in `12_generate_comparison_set_21504.py` (now `01_simulator/`).
 | Parameter | Value |
 |---|---|
 | Draws | **the same 1000 + 1000 as group 2** (`group2_drawn_parameters.csv`), seed 20260923 |
-| Physics | `modelo()` of `07_`: intra-channel smearing, spectrum normalized to the brightest channel, energy-conserving scattering, ×4 oversampling |
+| Physics | `model()` of `07_`: intra-channel smearing, spectrum normalized to the brightest channel, energy-conserving scattering, ×4 oversampling |
 | Grid | **21 504 channels** = each of the 672 channels (300.45 kHz) split into 32 (**9.389 kHz**); centres from 299.855 to 501.745 MHz |
 | Noise | σ = SEFD / √(Δν·τ) = **768.5 Jy** per channel and sample (135.9 Jy at 672 channels) |
 | A | S/N 8, **recomputed** with the 21 504-channel model |
@@ -140,7 +140,7 @@ Implemented in `12_generate_comparison_set_21504.py` (now `01_simulator/`).
 | Arrival | t_top (at 501.6 MHz) drawn between 3 and 5 s, with a seed per id |
 | Length | **variable**: ⌈t_top + sweep + pulse tail + 1 s⌉; in the pilot test, 10–77 s |
 | Format | **8-bit** `.fil`: floor 32, **1σ = 4 counts**, same quantization as group 2 |
-| Output | `manifest.csv` per set, `config.json`, `_hechos.jsonl` (allows resuming) |
+| Output | `manifest.csv` per set, `config.json`, `_done.jsonl` (allows resuming) |
 
 ### Validation (pilot test of 40 files)
 

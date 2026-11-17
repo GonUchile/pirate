@@ -1,14 +1,14 @@
-"""Lectura de la cabecera SIGPROC (.fil) que usan las figuras de 05_site_rfi/."""
+"""Reading of the SIGPROC (.fil) header used by the figures in 05_site_rfi/."""
 import numpy as np
 
 
-def leer_header(path):
-    """Header sigproc: (bytes del header, dict con nchans, nbits, fch1, foff)."""
+def read_header(path):
+    """SIGPROC header: (header bytes, dict with nchans, nbits, fch1, foff)."""
     with open(path, "rb") as f:
         raw = f.read(4096)
-    fin = raw.index(b"HEADER_END") + len(b"HEADER_END")
+    end = raw.index(b"HEADER_END") + len(b"HEADER_END")
     h, i = {}, raw.index(b"HEADER_START") + len(b"HEADER_START")
-    while i < fin - len(b"HEADER_END"):
+    while i < end - len(b"HEADER_END"):
         n = int.from_bytes(raw[i:i + 4], "little"); k = raw[i + 4:i + 4 + n].decode(); i += 4 + n
         if k in ("fch1", "foff", "tsamp", "tstart"):
             h[k] = float(np.frombuffer(raw[i:i + 8], "<f8")[0]); i += 8
@@ -18,4 +18,4 @@ def leer_header(path):
             n2 = int.from_bytes(raw[i:i + 4], "little"); i += 4 + n2
         elif k in ("src_raj", "src_dej", "az_start", "za_start"):
             i += 8
-    return raw[:fin], h
+    return raw[:end], h

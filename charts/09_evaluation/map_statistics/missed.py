@@ -1,12 +1,13 @@
 #!/usr/bin/env python
-"""T3b · ¿Qué FRB se pierden? Diagnóstico de cada archivo A/B/cortado (DM ≤ 1000) no detectado con el umbral 6,5.
+"""T3b · Which FRBs are missed? Diagnosis of each A/B/cut file (DM ≤ 1000) not detected at threshold 6.5.
 
-Categorías (en orden):
-  bajo_esperado       S/N esperado < umbral: el simulador ya lo deja bajo el umbral
-  fuera_tolerancia    hay un evento ≥ umbral en el mismo beam a ±1 s en t_top, pero falla DM o tiempo
-  medido_bajo         S/N esperado ≥ umbral, pero el mejor evento que acierta queda bajo el umbral (o no hay evento)
+Categories (in order):
+  low_expected        expected S/N < threshold: the simulator already leaves it below the threshold
+  out_of_tolerance    there is an event ≥ threshold in the same beam within ±1 s of t_top, but DM or time fails
+  measured_low        expected S/N ≥ threshold, but the best matching event is below the threshold (or there is none)
 
-Uso: python perdidos.py [CARPETA_CORRIDA]
+Usage (pirate environment): python missed.py [RUN_FOLDER]   (or export CHARTS_RUN=...)
+Output: RUN/analysis/ (or $CHARTS_ANALYSIS_OUT): missed.md, missed.json, 5_missed.png
 """
 import csv
 import json
@@ -19,26 +20,34 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 
-AQUI = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent
 if len(sys.argv) < 2 and "CHARTS_RUN" not in os.environ:
-    sys.exit(f"Uso: python {sys.argv[0]} CARPETA_DE_LA_CORRIDA   (o export CHARTS_RUN=...)")
-RUN = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(os.environ["CHARTS_RUN"])   # corrida completa con eventos_v0.log
-SALIDA = Path(os.environ.get("CHARTS_ANALYSIS_OUT", RUN / "analisis"))   # tablas y figuras
-SALIDA.mkdir(parents=True, exist_ok=True)
+    sys.exit(f"Usage: python {sys.argv[0]} RUN_FOLDER   (or export CHARTS_RUN=...)")
+RUN = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(os.environ["CHARTS_RUN"])
+OUTPUT = Path(os.environ.get("CHARTS_ANALYSIS_OUT", RUN / "analysis"))   # tables and figures
+OUTPUT.mkdir(parents=True, exist_ok=True)
 DD = Path(__file__).resolve().parents[2] / "06_configs" / "charts_64b_dm1000.yml"
-SEQ, DM_MIN, TOL_DM, TOL_T, UMBRAL = 200, 20.0, 0.10, 0.05, 6.50
+SEQ, DM_MIN, TOL_DM, TOL_T, THRESHOLD = 200, 20.0, 0.10, 0.05, 6.50
 plt.rcParams.update({"figure.facecolor": "white", "axes.facecolor": "white", "font.size": 10})
 
 
-def retardo_borde_a_top():
+def first_existing(*names):
+    for n in names:
+        if (RUN / n).exists():
+            return RUN / n
+    sys.exit(f"ERROR: none of {names} in {RUN}")
+
+
+def delay_edge_to_top():
     import pirate_frb as pf
     cfg = pf.DedispersionConfig.from_yaml(str(DD))
     f_lo, f_hi = cfg.zone_freq_edges[0], cfg.zone_freq_edges[-1]
     return 1e-3 / cfg.dm_per_unit_delay() * (f_lo ** -2 - 501.6 ** -2) / (f_lo ** -2 - f_hi ** -2)
 
 
-K_TOP = retardo_borde_a_top()
+K_TOP = delay_edge_to_top()
 ev_re = re.compile(r"beam_id=(\d+), dm=([\d.e+-]+), fpga_timestamp=(-?\d+), width=([\d.e+-]+) ms.*snr=([\d.e+-]+)")
 ev = np.array([(int(m.group(1)), float(m.group(2)), int(m.group(3)) / SEQ * 1e-3, float(m.group(4)), float(m.group(5)))
                for m in map(ev_re.search, (RUN / "sifter.log").read_text(errors="replace").splitlines()) if m])
@@ -54,75 +63,77 @@ def f(r, k, d=np.nan):
         return d
 
 
-filas = [r for r in csv.DictReader(open(RUN / "asignacion.csv")) if r["set"] != "NEG" and float(r["dm"]) <= 1000]
+rows = [r for r in csv.DictReader(open(first_existing("assignment.csv", "asignacion.csv")))
+        if r["set"] != "NEG" and float(r["dm"]) <= 1000]
 out = []
-for r in filas:
+for r in rows:
     b, dm = int(r["beam"]), float(r["dm"])
-    t_abs = int(r["inicio_muestra"]) / 1000 + float(r["t_top_s"])
+    t_abs = int(r.get("start_sample") or r["inicio_muestra"]) / 1000 + float(r["t_top_s"])
     box = (f(r, "boxcar_opt_ms", 0) or f(r, "boxcar_opt_visible_ms", 0)) / 1000
-    esp = f(r, "snr_visible_esperado") if r["set"] == "P" else f(r, "snr_esperado")
+    exp = f(r, "snr_visible_esperado") if r["set"] == "P" else f(r, "snr_esperado")
     tol_t = max(TOL_T, box)
     sel = e_b == b
     ok = sel & (np.abs(e_dm - dm) <= max(TOL_DM * dm, 1.0)) & (np.abs(e_t - t_abs) <= tol_t)
-    mejor = e_s[ok].max() if ok.any() else 0.0
-    if mejor >= UMBRAL:
+    best = e_s[ok].max() if ok.any() else 0.0
+    if best >= THRESHOLD:
         continue
-    cerca = sel & (np.abs(e_t - t_abs) <= 1.0) & (e_s >= UMBRAL)
-    d = dict(name=r["name"], set=r["set"], borde=r.get("borde", ""), dm=dm, snr_esp=esp, mejor=mejor,
-             ancho_ms=f(r, "width_s") * 1e3, scat_600_ms=f(r, "scat_600_s") * 1e3, boxcar_opt_ms=box * 1e3,
-             frac_visible=f(r, "frac_energia_visible"), n_canales=f(r, "n_canales_emision"))
-    if np.isfinite(esp) and esp < UMBRAL:
-        d["cat"] = "bajo_esperado"
-    elif cerca.any():
-        k = np.flatnonzero(cerca)[np.argmax(e_s[cerca])]
-        d.update(cat="fuera_tolerancia", ev_snr=e_s[k], ev_dm=e_dm[k], ev_w=e_w[k],
+    near = sel & (np.abs(e_t - t_abs) <= 1.0) & (e_s >= THRESHOLD)
+    d = dict(name=r["name"], set=r["set"], edge=r.get("borde", ""), dm=dm, snr_exp=exp, best=best,
+             width_ms=f(r, "width_s") * 1e3, scat_600_ms=f(r, "scat_600_s") * 1e3, boxcar_opt_ms=box * 1e3,
+             frac_visible=f(r, "frac_energia_visible"), n_channels=f(r, "n_canales_emision"))
+    if np.isfinite(exp) and exp < THRESHOLD:
+        d["cat"] = "low_expected"
+    elif near.any():
+        k = np.flatnonzero(near)[np.argmax(e_s[near])]
+        d.update(cat="out_of_tolerance", ev_snr=e_s[k], ev_dm=e_dm[k], ev_w=e_w[k],
                  err_dm=e_dm[k] - dm, err_t_ms=(e_t[k] - t_abs) * 1e3, tol_t_ms=tol_t * 1e3)
     else:
-        d["cat"] = "medido_bajo"
+        d["cat"] = "measured_low"
     out.append(d)
 
-tot = {s: sum(r["set"] == s for r in filas) for s in ("A", "B", "P")}
-cats = ("bajo_esperado", "medido_bajo", "fuera_tolerancia")
-txt = f"# T3b · FRB perdidos con umbral {UMBRAL} (DM ≤ 1000)\n\n"
-txt += "| Set | total | perdidos | " + " | ".join(cats) + " |\n|---|---|---|---|---|---|\n"
+tot = {s: sum(r["set"] == s for r in rows) for s in ("A", "B", "P")}
+cats = ("low_expected", "measured_low", "out_of_tolerance")
+txt = f"# T3b · FRBs missed at threshold {THRESHOLD} (DM ≤ 1000)\n\n"
+txt += "| Set | total | missed | " + " | ".join(cats) + " |\n|---|---|---|---|---|---|\n"
 for s in ("A", "B", "P"):
     p = [d for d in out if d["set"] == s]
     txt += f"| {s} | {tot[s]} | {len(p)} | " + " | ".join(str(sum(d['cat'] == c for d in p)) for c in cats) + " |\n"
-txt += "\n## Cortados perdidos según borde\n\n"
+txt += "\n## Cut files missed, by edge (inicio = start, fin = end)\n\n"
 for bo in ("inicio", "fin"):
-    p = [d for d in out if d["set"] == "P" and d["borde"] == bo]
-    txt += f"- {bo}: {len(p)} perdidos de {sum(r['set'] == 'P' and r.get('borde') == bo for r in filas)}; " \
+    p = [d for d in out if d["set"] == "P" and d["edge"] == bo]
+    txt += f"- {bo}: {len(p)} missed of {sum(r['set'] == 'P' and r.get('borde') == bo for r in rows)}; " \
            + ", ".join(f"{c} {sum(d['cat'] == c for d in p)}" for c in cats) + "\n"
-txt += "\n## medido_bajo y fuera_tolerancia, uno por uno\n\n| archivo | S/N esp | mejor | DM | ancho ms | scat600 ms | boxcar ms | frac vis | categoría | detalle |\n|---|---|---|---|---|---|---|---|---|---|\n"
-for d in sorted([d for d in out if d["cat"] != "bajo_esperado"], key=lambda d: -(d["snr_esp"] if np.isfinite(d["snr_esp"]) else 0)):
-    det = (f"evento S/N {d['ev_snr']:.1f} DM {d['ev_dm']:.0f} (ΔDM {d['err_dm']:+.0f}), Δt {d['err_t_ms']:+.0f} ms "
-           f"(tol {d['tol_t_ms']:.0f}), ancho {d['ev_w']:g}") if d["cat"] == "fuera_tolerancia" else ""
-    txt += (f"| {d['name']} | {d['snr_esp']:.1f} | {d['mejor']:.2f} | {d['dm']:.0f} | {d['ancho_ms']:.2f} | "
+txt += ("\n## measured_low and out_of_tolerance, one by one\n\n| file | exp. S/N | best | DM | width ms | scat600 ms | "
+        "boxcar ms | frac vis | category | detail |\n|---|---|---|---|---|---|---|---|---|---|\n")
+for d in sorted([d for d in out if d["cat"] != "low_expected"], key=lambda d: -(d["snr_exp"] if np.isfinite(d["snr_exp"]) else 0)):
+    det = (f"event S/N {d['ev_snr']:.1f} DM {d['ev_dm']:.0f} (ΔDM {d['err_dm']:+.0f}), Δt {d['err_t_ms']:+.0f} ms "
+           f"(tol {d['tol_t_ms']:.0f}), width {d['ev_w']:g}") if d["cat"] == "out_of_tolerance" else ""
+    txt += (f"| {d['name']} | {d['snr_exp']:.1f} | {d['best']:.2f} | {d['dm']:.0f} | {d['width_ms']:.2f} | "
             f"{d['scat_600_ms']:.1f} | {d['boxcar_opt_ms']:.0f} | {d['frac_visible']:.2f} | {d['cat']} | {det} |\n")
-txt += "\n## Set A (S/N 8) según el boxcar óptimo (ancho intrínseco + scattering)\n\n| boxcar óptimo | n | recall |\n|---|---|---|\n"
-perd_A = {d["name"] for d in out if d["set"] == "A"}
-bxA = [((f(r, "boxcar_opt_ms", 0)), r["name"] in perd_A) for r in filas if r["set"] == "A"]
+txt += "\n## Set A (S/N 8) by optimal boxcar (intrinsic width + scattering)\n\n| optimal boxcar | n | recall |\n|---|---|---|\n"
+missed_A = {d["name"] for d in out if d["set"] == "A"}
+bxA = [((f(r, "boxcar_opt_ms", 0)), r["name"] in missed_A) for r in rows if r["set"] == "A"]
 for lo, hi in ((0, 8), (8, 50), (50, 200), (200, 1e9)):
     sel_ = [p_ for b_, p_ in bxA if lo <= b_ < hi]
     if sel_:
         txt += f"| {lo:g}–{hi:g} ms | {len(sel_)} | {100 * (1 - np.mean(sel_)):.1f} % |\n".replace("–1e+09", "+")
-(SALIDA / "perdidos.md").write_text(txt)
-(SALIDA / "perdidos.json").write_text(json.dumps(out, indent=1, default=float, ensure_ascii=False))
+(OUTPUT / "missed.md").write_text(txt)
+(OUTPUT / "missed.json").write_text(json.dumps(out, indent=1, default=float, ensure_ascii=False))
 print(txt)
 
-# figura: S/N esperado de los perdidos por categoría
+# figure: expected S/N of the missed files per category
 fig, ax = plt.subplots(figsize=(8, 4.2))
-col = {"bajo_esperado": "#440154", "medido_bajo": "#21918c", "fuera_tolerancia": "#fde725"}
+col = {"low_expected": plt.cm.viridis(0.0), "measured_low": plt.cm.viridis(0.5), "out_of_tolerance": plt.cm.viridis(0.95)}
 bins = np.logspace(-1.5, 2.5, 40)
-ax.hist([[d["snr_esp"] for d in out if d["cat"] == c and np.isfinite(d["snr_esp"])] for c in cats], bins=bins,
+ax.hist([[d["snr_exp"] for d in out if d["cat"] == c and np.isfinite(d["snr_exp"])] for c in cats], bins=bins,
         stacked=True, color=[col[c] for c in cats], edgecolor="0.3", lw=0.3,
-        label=["S/N esperado bajo el umbral", "esperado ≥ umbral, medido bajo", "detectado fuera de tolerancia"])
-ax.axvline(UMBRAL, color="black", ls="--", lw=1)
+        label=["expected S/N below the threshold", "expected ≥ threshold, measured below", "detected out of tolerance"])
+ax.axvline(THRESHOLD, color="black", ls="--", lw=1)
 ax.set_xscale("log")
 ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}"))
-ax.set_xlabel("S/N esperado (cortados: S/N visible)")
-ax.set_ylabel("FRB perdidos")
-ax.set_title(f"FRB perdidos con umbral {UMBRAL} (A + B + cortados, DM ≤ 1000): {len(out)}")
+ax.set_xlabel("expected S/N (cut files: visible S/N)")
+ax.set_ylabel("missed FRBs")
+ax.set_title(f"FRBs missed at threshold {THRESHOLD} (A + B + cut, DM ≤ 1000): {len(out)}")
 ax.legend(fontsize=8)
 fig.tight_layout()
-fig.savefig(SALIDA / "5_perdidos.png", dpi=130)
+fig.savefig(OUTPUT / "5_missed.png", dpi=130)

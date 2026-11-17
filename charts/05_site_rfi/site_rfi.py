@@ -22,8 +22,8 @@ different sidelobe gain.
 
 Works with numpy or cupy (xp).
 
-Note: the keys inside site_rfi_model.npz (frecuencias_mhz, r_p, e, psys_cuentas) are the ones written by the model
-generator and are kept as they are, so that existing model files remain readable.
+Model keys: frequencies_mhz, r_p, e, psys_counts. Model files written before the translation use frecuencias_mhz and
+psys_cuentas; both spellings are accepted.
 """
 import os
 from pathlib import Path
@@ -39,14 +39,15 @@ class SiteRfi:
                  block_ms=4096, seed=0, model=MODEL, xp=np):
         m = np.load(model)
         self.xp = xp
-        fm = m["frecuencias_mhz"]
+        key = lambda en, es: en if en in m.files else es      # English keys, or those of older model files
+        fm = m[key("frequencies_mhz", "frecuencias_mhz")]
         # .fil channel -> nearest measured channel in frequency (the grids differ by < 0.2 %)
         idx = np.clip(np.searchsorted(fm, fil_freqs_mhz), 1, len(fm) - 1)
         idx = np.where(np.abs(fm[idx - 1] - fil_freqs_mhz) < np.abs(fm[idx] - fil_freqs_mhz), idx - 1, idx)
         g = 10 ** (-attenuation_db / 10)
         rp = np.clip(m["r_p"][idx], 0, None) * g if persistent else np.zeros(len(idx), np.float32)
         visible = 10 * np.log10(1 + rp) > line_threshold_db
-        self.psys = float(m["psys_cuentas"])
+        self.psys = float(m[key("psys_counts", "psys_cuentas")])
         self.rp = xp.asarray(rp.astype(np.float32))
         self.visible = xp.asarray(visible)
         e = m["e"][:, idx] if fast else np.zeros((len(m["e"]), len(idx)), np.float16)

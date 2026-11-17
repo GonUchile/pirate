@@ -1,6 +1,6 @@
-# Prueba de 64 beams del grupo 3 (21 504 canales, 1 ms), búsqueda hasta DM ~1107.
-# Bordes de banda = bordes de la grilla fina (672 canales x 32): 299,84978 - 501,75022 MHz.
-# Rank 15, un árbol, boxcar máximo 32 ms, sin subbandas (kernels production existentes).
+# Group-3 64-beam test (21 504 channels, 1 ms), search up to DM ~1107.
+# Band edges = edges of the fine grid (672 channels x 32): 299.84978 - 501.75022 MHz.
+# Rank 15, one tree, maximum boxcar 32 ms, no subbands (existing production kernels).
 zone_freq_edges: [299.8497764530551, 501.7502235469449]
 zone_nfreq: [21504]
 time_sample_ms: 1.0

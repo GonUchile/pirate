@@ -133,9 +133,10 @@ Performance of the Python emitter (64 beams, 16 processes, 16-core CPU): ~1.07×
 ## Data formats kept as generated
 
 The names of the group-3 dataset on disk (folders `A_snr_fijo`, `B_amplitud_fija`, `negativos`, `parcial`, and the
-columns of their `manifest.csv`, e.g. `t_top_s`, `snr_esperado`, `barrido_s`, `dm_equivalente_pos`) and the keys inside
-`site_rfi_model.npz` come from the generators and are kept unchanged, so that the existing 4.3 TB dataset and model
-files remain readable and the simulator still reproduces them byte for byte.
+columns of their `manifest.csv`, e.g. `t_top_s`, `snr_esperado`, `barrido_s`, `dm_equivalente_pos`) come from the
+generators and are kept unchanged, so that the existing 4.3 TB dataset remains readable and the simulator still
+reproduces it byte for byte. `05_site_rfi/02_rfi_model.py` now writes English keys in `site_rfi_model.npz`;
+`site_rfi.py` also reads model files written with the earlier Spanish keys.
 
 ## Known limitations
 

@@ -1,6 +1,6 @@
 [
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 13,
   "nt": 512,
   "clag": 20,
@@ -12,7 +12,7 @@
   "err": "RuntimeError: Kernel not found in registry: CoalescedDdKernel2(dtype=float16, dd_rank=7, subbands={0,0,0,0,1}, Tinner=1, Wmax=32, N=1, M=16)"
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 13,
   "nt": 1024,
   "clag": 10,
@@ -24,7 +24,7 @@
   "err": "RuntimeError: Kernel not found in registry: CoalescedDdKernel2(dtype=float16, dd_rank=7, subbands={0,0,0,0,1}, Tinner=1, Wmax=32, N=1, M=16)"
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 13,
   "nt": 2048,
   "clag": 5,
@@ -36,7 +36,7 @@
   "err": "RuntimeError: Kernel not found in registry: CoalescedDdKernel2(dtype=float16, dd_rank=7, subbands={0,0,0,0,1}, Tinner=1, Wmax=32, N=1, M=16)"
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 13,
   "nt": 4096,
   "clag": 2,
@@ -48,7 +48,7 @@
   "err": "RuntimeError: Kernel not found in registry: CoalescedDdKernel2(dtype=float16, dd_rank=7, subbands={0,0,0,0,1}, Tinner=1, Wmax=32, N=1, M=16)"
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 13,
   "nt": 8192,
   "clag": 1,
@@ -60,7 +60,7 @@
   "err": "RuntimeError: Kernel not found in registry: CoalescedDdKernel2(dtype=float16, dd_rank=7, subbands={0,0,0,0,1}, Tinner=1, Wmax=32, N=1, M=16)"
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 14,
   "nt": 512,
   "clag": 20,
@@ -72,7 +72,7 @@
   "err": "RuntimeError: Kernel not found in registry: CoalescedDdKernel2(dtype=float16, dd_rank=7, subbands={0,0,0,0,1}, Tinner=1, Wmax=32, N=1, M=16)"
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 14,
   "nt": 1024,
   "clag": 10,
@@ -84,7 +84,7 @@
   "err": "RuntimeError: Kernel not found in registry: CoalescedDdKernel2(dtype=float16, dd_rank=7, subbands={0,0,0,0,1}, Tinner=1, Wmax=32, N=1, M=16)"
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 14,
   "nt": 2048,
   "clag": 5,
@@ -96,7 +96,7 @@
   "err": "RuntimeError: Kernel not found in registry: CoalescedDdKernel2(dtype=float16, dd_rank=7, subbands={0,0,0,0,1}, Tinner=1, Wmax=32, N=1, M=16)"
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 14,
   "nt": 4096,
   "clag": 2,
@@ -108,7 +108,7 @@
   "err": "RuntimeError: Kernel not found in registry: CoalescedDdKernel2(dtype=float16, dd_rank=7, subbands={0,0,0,0,1}, Tinner=1, Wmax=32, N=1, M=16)"
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 14,
   "nt": 8192,
   "clag": 1,
@@ -120,7 +120,7 @@
   "err": "RuntimeError: Kernel not found in registry: CoalescedDdKernel2(dtype=float16, dd_rank=7, subbands={0,0,0,0,1}, Tinner=1, Wmax=32, N=1, M=16)"
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 15,
   "nt": 512,
   "clag": 20,
@@ -135,7 +135,7 @@
   "h2g_full": 19.7018
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 15,
   "nt": 1024,
   "clag": 10,
@@ -150,7 +150,7 @@
   "h2g_full": 21.394350000000003
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 15,
   "nt": 2048,
   "clag": 5,
@@ -165,7 +165,7 @@
   "h2g_full": 22.724600000000002
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 15,
   "nt": 4096,
   "clag": 2,
@@ -180,7 +180,7 @@
   "h2g_full": 22.54175
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 15,
   "nt": 8192,
   "clag": 1,
@@ -195,7 +195,7 @@
   "h2g_full": 22.90955
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 16,
   "nt": 512,
   "clag": 20,
@@ -210,7 +210,7 @@
   "h2g_full": 20.03835
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 16,
   "nt": 1024,
   "clag": 10,
@@ -225,7 +225,7 @@
   "h2g_full": 21.5537
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 16,
   "nt": 2048,
   "clag": 5,
@@ -240,7 +240,7 @@
   "h2g_full": 21.8767
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 16,
   "nt": 4096,
   "clag": 2,
@@ -255,7 +255,7 @@
   "h2g_full": 22.2759
  },
  {
-  "tipo": "dm_nt",
+  "kind": "dm_nt",
   "rank": 16,
   "nt": 8192,
   "clag": 1,
@@ -269,7 +269,7 @@
   "err": "RuntimeError: CUDA error: cudaMalloc((void **) &this->base, this->nbytes_allocated) returned 2 (out of memory) [src_lib/mem_utils.cpp:261]"
  },
  {
-  "tipo": "arboles",
+  "kind": "trees",
   "rank": 15,
   "nt": 2048,
   "clag": 5,
@@ -284,7 +284,7 @@
   "h2g_full": 22.3729
  },
  {
-  "tipo": "arboles",
+  "kind": "trees",
   "rank": 15,
   "nt": 2048,
   "clag": 2,
@@ -299,7 +299,7 @@
   "h2g_full": 21.83635
  },
  {
-  "tipo": "arboles",
+  "kind": "trees",
   "rank": 15,
   "nt": 2048,
   "clag": 1,
@@ -314,7 +314,7 @@
   "h2g_full": 21.673250000000003
  },
  {
-  "tipo": "arboles",
+  "kind": "trees",
   "rank": 15,
   "nt": 2048,
   "clag": 5,
@@ -329,7 +329,7 @@
   "h2g_full": 21.33795
  },
  {
-  "tipo": "arboles",
+  "kind": "trees",
   "rank": 15,
   "nt": 2048,
   "clag": 2,
@@ -344,7 +344,7 @@
   "h2g_full": 20.8236
  },
  {
-  "tipo": "arboles",
+  "kind": "trees",
   "rank": 15,
   "nt": 2048,
   "clag": 1,
@@ -359,7 +359,7 @@
   "h2g_full": 21.114150000000002
  },
  {
-  "tipo": "clag",
+  "kind": "clag",
   "rank": 15,
   "nt": 2048,
   "clag": 1,
@@ -374,7 +374,7 @@
   "h2g_full": 22.19925
  },
  {
-  "tipo": "clag",
+  "kind": "clag",
   "rank": 15,
   "nt": 2048,
   "clag": 2,
@@ -389,7 +389,7 @@
   "h2g_full": 22.646250000000002
  },
  {
-  "tipo": "clag",
+  "kind": "clag",
   "rank": 15,
   "nt": 2048,
   "clag": 3,
@@ -404,7 +404,7 @@
   "h2g_full": 22.6411
  },
  {
-  "tipo": "clag",
+  "kind": "clag",
   "rank": 15,
   "nt": 2048,
   "clag": 5,
@@ -419,7 +419,7 @@
   "h2g_full": 22.74605
  },
  {
-  "tipo": "clag",
+  "kind": "clag",
   "rank": 15,
   "nt": 2048,
   "clag": 8,
@@ -434,7 +434,7 @@
   "h2g_full": 22.869
  },
  {
-  "tipo": "clag",
+  "kind": "clag",
   "rank": 15,
   "nt": 2048,
   "clag": 12,
@@ -448,7 +448,7 @@
   "err": "RuntimeError: CUDA error: cudaMalloc((void **) &this->base, this->nbytes_allocated) returned 2 (out of memory) [src_lib/mem_utils.cpp:261]"
  },
  {
-  "tipo": "clag",
+  "kind": "clag",
   "rank": 15,
   "nt": 2048,
   "clag": 16,
@@ -462,7 +462,7 @@
   "err": "RuntimeError: CUDA error: cudaMalloc((void **) &this->base, this->nbytes_allocated) returned 2 (out of memory) [src_lib/mem_utils.cpp:261]"
  },
  {
-  "tipo": "arboles",
+  "kind": "trees",
   "rank": 16,
   "nt": 2048,
   "clag": 1,
