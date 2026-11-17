@@ -1,141 +1,142 @@
-# Instalación
+# Installation
 
-Esta carpeta (`charts/`) vive dentro del fork de pirate de CHARTS, https://github.com/charts-experiment/pirate:
-la carpeta de arriba **es** pirate. Se clona una vez y se compila ahí mismo.
+This folder (`charts/`) lives inside the CHARTS fork of pirate, https://github.com/charts-experiment/pirate:
+the folder above **is** pirate. It is cloned once and built in place.
 
-Qué instalar depende de qué pieza corre en cada PC:
+What to install depends on which piece runs on each machine:
 
-| PC | Corre | Necesita |
+| Machine | Runs | Needs |
 |---|---|---|
-| **PC de búsqueda** (con GPU NVIDIA) | `servidor/` (pirate + grouper), `evaluacion/` | el fork compilado, ksgpu y su entorno conda |
-| **PC que produce los datos** (puede ser el mismo) | `emisor/` | Python ≥ 3.9 con numpy y PyYAML, el clon del fork (solo usa `charts/`), los datos |
-| **Para generar los datos de prueba** (una vez) | `simulador/` | Python 3.12, numpy, scipy y fitburst (`simulador/requirements.txt`) |
-| **Para regenerar la RFI del sitio** (opcional) | `rfi_sitio/` 00–07 | numpy, scipy, h5py, matplotlib y el baseband del sitio |
+| **Search machine** (with an NVIDIA GPU) | `server/` (pirate + grouper + sifter), `evaluation/` | the fork built, ksgpu and their conda environment |
+| **Machine producing the data** (can be the same) | `emitter/` | Python ≥ 3.9 with numpy and PyYAML, the clone of the fork (only `charts/` is used), the data |
+| **To generate the test data** (once) | `simulator/` | Python 3.12, numpy, scipy and fitburst (`simulator/requirements.txt`) |
+| **To regenerate the site RFI** (optional) | `site_rfi/` 00–07 | numpy, scipy, h5py, matplotlib and the site baseband |
 
-## 1. Repositorios y versiones probadas
+## 1. Repositories and tested versions
 
-| Repositorio | Dirección | Versión probada | Para qué |
+| Repository | Address | Tested version | Purpose |
 |---|---|---|---|
-| **pirate (fork de CHARTS)** | https://github.com/charts-experiment/pirate | basado en kmsmith137/pirate commit `255edd26c1c77e3f154fc5accd8014f073582b66` (v1.5.0, 2026-09-07) | Recepción por red y dedispersión en árbol en GPU. Este repositorio; `charts/` es lo de CHARTS y el resto es pirate sin cambios |
-| **ksgpu** | https://github.com/kmsmith137/ksgpu | commit `5c81be2dea54226587f80eb206a35ca92c7160c5` (v1.5.0, 2026-09-07) | Librería de GPU que usa pirate (dependencia obligatoria) |
-| **fitburst** (CHIME/FRB) | https://github.com/CHIMEFRB/fitburst | commit `3c76da8f9e3ec7bc21951ce1b4a26a0255096b69` | Forma de pulso del simulador (`simulador/`) |
-| Kotekan (opcional) | git@github.com:charts-experiment/kotekan.git | commit `1917da5b` (2021.10-426) | Referencia para la adaptación del emisor (`docs/PROTOCOLO_pirate_y_adaptacion_Kotekan.md`); no hace falta para correr la prueba |
+| **pirate (CHARTS fork)** | https://github.com/charts-experiment/pirate | based on kmsmith137/pirate commit `255edd26c1c77e3f154fc5accd8014f073582b66` (v1.5.0, 2026-09-07) | Network reception and tree dedispersion on the GPU. This repository; `charts/` is the CHARTS code and the rest is unchanged pirate |
+| **ksgpu** | https://github.com/kmsmith137/ksgpu | commit `5c81be2dea54226587f80eb206a35ca92c7160c5` (v1.5.0, 2026-09-07) | GPU library used by pirate (required dependency) |
+| **fitburst** (CHIME/FRB) | https://github.com/CHIMEFRB/fitburst | commit `3c76da8f9e3ec7bc21951ce1b4a26a0255096b69` | Pulse shape for the simulator (`simulator/`) |
+| Kotekan (optional) | git@github.com:charts-experiment/kotekan.git | commit `1917da5b` (2021.10-426) | Reference for porting the emitter (`docs/PROTOCOL_pirate_and_Kotekan_adaptation.md`); not needed to run the test |
 
-El pirate original es https://github.com/kmsmith137/pirate. Si el fork se actualiza con versiones nuevas de
-kmsmith137, puede funcionar, pero el protocolo de red, las configs y los kernels compilados se probaron con 1.5.0.
+The original pirate is https://github.com/kmsmith137/pirate. If the fork is updated with newer versions from
+kmsmith137 it may work, but the network protocol, the configs and the compiled kernels were tested with 1.5.0.
 
-## 2. PC de búsqueda: pirate
+## 2. Search machine: pirate
 
-### Requisitos del sistema (no los instala conda)
+### System requirements (not installed by conda)
 
-| | Probado con |
+| | Tested with |
 |---|---|
-| GPU NVIDIA | RTX 4090, 24 GB (arquitectura sm_89) |
+| NVIDIA GPU | RTX 4090, 24 GB (sm_89 architecture) |
 | Driver | 590.48.01 |
-| CUDA toolkit del sistema (`nvcc`) | 13.1 |
-| Compilador del sistema | gcc / g++ 13.3 (Ubuntu 24.04) |
-| conda (miniconda o miniforge) | cualquiera reciente |
-| RAM | ≥ 150 GB con `configs/prueba_64b.yml` (64 GB con la config optimizada) |
-| Disco | ~10 GB para el entorno y la compilación |
+| System CUDA toolkit (`nvcc`) | 13.1 |
+| System compiler | gcc / g++ 13.3 (Ubuntu 24.04) |
+| conda (miniconda or miniforge) | any recent one |
+| RAM | ≥ 150 GB with `configs/test_64b.yml` (64 GB with the optimized config) |
+| Disk | ~10 GB for the environment and the build |
 
-### Instalación automática
+### Automatic installation
 
 ```bash
 git clone https://github.com/charts-experiment/pirate.git && cd pirate
-charts/instalar_pirate.sh /ruta/del/entorno [ARQUITECTURA]
-# ejemplo: charts/instalar_pirate.sh ~/entornos/pirate 89      (89 = RTX 4090; 80 = A100; 90 = H100)
+charts/install_pirate.sh /path/to/environment [ARCHITECTURE]
+# example: charts/install_pirate.sh ~/envs/pirate 89      (89 = RTX 4090; 80 = A100; 90 = H100)
 ```
 
-El script **compila el fork en el que está** (no descarga pirate), clona ksgpu al lado del fork en el commit
-probado, crea el entorno conda y compila los dos. Tarda ~5–10 min.
+The script **builds the fork it lives in** (it does not download pirate), clones ksgpu next to the fork at the tested
+commit, creates the conda environment and builds both. It takes ~5–10 min.
 
-### Instalación manual (lo mismo que hace el script)
+### Manual installation (what the script does)
 
 ```bash
-mkdir -p ~/fuentes && cd ~/fuentes
-git clone https://github.com/charts-experiment/pirate.git       # el fork: pirate + charts/
+mkdir -p ~/src && cd ~/src
+git clone https://github.com/charts-experiment/pirate.git       # the fork: pirate + charts/
 git clone https://github.com/kmsmith137/ksgpu  && git -C ksgpu  checkout 5c81be2dea54226587f80eb206a35ca92c7160c5
 (cd pirate && git submodule update --init --recursive)          # asdf-cxx
 
-# compilar solo para la GPU que se tiene (acelera mucho la compilación)
+# build only for the GPU you have (makes the build much faster)
 echo 'NVCC_ARCH = -gencode arch=compute_89,code=sm_89' > ksgpu/config.mk
 echo 'NVCC_ARCH = -gencode arch=compute_89,code=sm_89' > pirate/config.mk
 
-conda env create -p ~/entornos/pirate -f pirate/environment_dev.yml
-conda activate ~/entornos/pirate
-conda install -y -c conda-forge clang-format                    # lo usa el generador de kernels y no viene en el yml
+conda env create -p ~/envs/pirate -f pirate/environment_dev.yml
+conda activate ~/envs/pirate
+conda install -y -c conda-forge clang-format                    # used by the kernel generator, not in the yml
 
-python -m pip install pipmake                                   # usar SIEMPRE "python -m pip" (ver problemas abajo)
+python -m pip install pipmake                                   # ALWAYS use "python -m pip" (see problems below)
 (cd ksgpu  && python -m pip install --no-build-isolation -v -e .)
-(cd pirate && make asdf-cxx/include/asdf/config.hxx)            # evita una carrera de make -j
+(cd pirate && make asdf-cxx/include/asdf/config.hxx)            # avoids a make -j race
 (cd pirate && python -m pip install --no-build-isolation -v -e .)
 ```
 
-### Verificar
+### Check
 
 ```bash
-conda activate ~/entornos/pirate
+conda activate ~/envs/pirate
 pirate_frb --help
-pirate_frb show dedisperser charts/configs/charts_64b_dm1000.yml       # memoria del árbol: host_zones / gpu_zones
-pirate_frb time_dedisperser -H -n 24 charts/configs/charts_64b_dm1000.yml   # RTX 4090: ~764 beams a tiempo real
+pirate_frb show dedisperser charts/configs/charts_64b_dm1000.yml       # tree memory: host_zones / gpu_zones
+pirate_frb time_dedisperser -H -n 24 charts/configs/charts_64b_dm1000.yml   # RTX 4090: ~764 beams in real time
 ```
 
-### Problemas que aparecieron y cómo se resolvieron
+### Problems found and how they were solved
 
-| Síntoma | Causa | Solución |
+| Symptom | Cause | Solution |
 |---|---|---|
-| `pip` instala en Python 2.7 | `~/.local/bin/pip` gana en el PATH | usar `python -m pip` dentro del entorno |
-| El generador de kernels falla por `clang-format` | `environment_dev.yml` no lo trae | `conda install -c conda-forge clang-format` |
-| `asdf/config.hxx: No such file` con `make -j` | carrera en la compilación | `make asdf-cxx/include/asdf/config.hxx` antes |
-| `Kernel not found in registry` al correr | la combinación pedida (rank, boxcar, subbandas) no está entre los kernels compilados | usar las configs del repositorio, o agregar la fila en `makefile_helper.py` de pirate y recompilar |
-| `mmap(... MAP_HUGETLB) failed` en `time_dedisperser` | sin hugepages configuradas | agregar `-H` (o configurar `vm.nr_hugepages`) |
-| `CUDA out of memory` al arrancar el servidor | pool de GPU de pirate + grouper + emisor > memoria de la GPU | bajar `servidor.memoria_gpu_gib` o `max_gpu_clag` en el YAML |
+| `pip` installs into Python 2.7 | `~/.local/bin/pip` wins in the PATH | use `python -m pip` inside the environment |
+| The kernel generator fails on `clang-format` | `environment_dev.yml` does not include it | `conda install -c conda-forge clang-format` |
+| `asdf/config.hxx: No such file` with `make -j` | race in the build | `make asdf-cxx/include/asdf/config.hxx` first |
+| `Kernel not found in registry` at run time | the requested combination (rank, boxcar, subbands) is not among the compiled kernels | use the repository configs, or add the row to pirate's `makefile_helper.py` and rebuild |
+| `mmap(... MAP_HUGETLB) failed` in `time_dedisperser` | no hugepages configured | add `-H` (or configure `vm.nr_hugepages`) |
+| `CUDA out of memory` when the server starts | pirate's GPU pool + grouper + emitter > GPU memory | lower `server.gpu_gib` or `max_gpu_clag` in the YAML |
 
-Para actualizar: `git pull` en el fork (y en ksgpu si cambia) y `make -j` en cada uno, con el entorno activo (la instalación es
-editable; no hace falta repetir el pip).
+To update: `git pull` in the fork (and in ksgpu if it changes) and `make -j` in each, with the environment active (the
+installation is editable; the pip step does not need to be repeated).
 
-## 3. PC que produce los datos: el emisor
+## 3. Machine producing the data: the emitter
 
 ```bash
 git clone https://github.com/charts-experiment/pirate.git && cd pirate/charts
-python3 -m pip install -r emisor/requirements.txt              # numpy y PyYAML
-# opcional, para cuantizar o inyectar RFI en GPU (gpu: true en el YAML): cupy con la versión de CUDA del PC
+python3 -m pip install -r emitter/requirements.txt              # numpy and PyYAML
+# optional, to quantize or inject RFI on the GPU (gpu: true in the YAML): cupy for the machine's CUDA version
 ```
 
-No necesita compilar pirate ni GPU: solo usa la carpeta `charts/`. Si corre en el mismo PC de búsqueda, se puede usar el entorno de pirate (ya tiene numpy,
-PyYAML y cupy).
+It needs neither building pirate nor a GPU: it only uses the `charts/` folder. On the search machine itself, pirate's
+environment can be used (it already has numpy, PyYAML and cupy).
 
-## 4. Datos (no van en el repositorio)
+## 4. Data (not in the repository)
 
-| Dato | Tamaño | De dónde sale | Variable |
+| Data | Size | Where it comes from | Variable |
 |---|---|---|---|
-| Grupo 3: 4000 .fil de 21 504 canales (A, B, negativos, cortados) con `manifest.csv` | ~4,3 TB | `simulador/12_generar_set_comparacion_21504.py` (ver sección 4b) | `CHARTS_SET_DIR` |
-| Modelo de RFI del sitio `modelo_rfi_sitio.npz` | 177 MB | `rfi_sitio/01_espectro_dinamico.py` + `02_modelo_rfi.py` desde el baseband | `CHARTS_RFI_MODELO` |
-| Baseband del sitio (2026-09-02) | 25 GB | captura del X-engine de CHARTS | `CHARTS_BASEBAND_DIR` |
+| Group 3: 4000 .fil files of 21 504 channels (A, B, negatives, partial) with `manifest.csv` | ~4.3 TB | `simulator/12_generate_comparison_set_21504.py` (see section 4b) | `CHARTS_SET_DIR` |
+| Site RFI model `site_rfi_model.npz` | 177 MB | `site_rfi/01_dynamic_spectrum.py` + `02_rfi_model.py` from the baseband | `CHARTS_RFI_MODEL` |
+| Site baseband (2026-09-02) | 25 GB | capture from the CHARTS X-engine | `CHARTS_BASEBAND_DIR` |
 
-Para una prueba rápida sin el set completo, `--beams-con-datos 1 --limite 2` usa solo 8 archivos.
+For a quick test without the full set, `--beams-with-data 1 --limit 2` uses only 8 files.
 
-## 4b. Generar los datos de prueba
-
-```bash
-python3.12 -m venv ~/entornos/simulador && source ~/entornos/simulador/bin/activate
-python -m pip install -r simulador/requirements.txt
-cd simulador
-python 12_generar_set_comparacion_21504.py --out /ruta/grupo3 --workers 24          # 4000 archivos, ~4,3 TB
-python 12_generar_set_comparacion_21504.py --out /ruta/prueba --limite 2             # 8 archivos para probar
-```
-
-Es determinista: genera los mismos archivos que se usaron en las pruebas (verificado byte a byte). Ver `simulador/README.md`.
-
-## 5. Primera corrida
+## 4b. Generating the test data
 
 ```bash
-cd pirate/charts                                  # todo se corre desde charts/
-conda activate ~/entornos/pirate                  # pirate se autodetecta (o export CHARTS_PIRATE_ENV=~/entornos/pirate)
-export CHARTS_SET_DIR=/ruta/al/grupo3
-python servidor/lanzador.py local --config configs/prueba_64b.yml \
-    --salida resultados/primera --limite 2 --procesos 16
-cat resultados/primera/resultados.md
+python3.12 -m venv ~/envs/simulator && source ~/envs/simulator/bin/activate
+python -m pip install -r simulator/requirements.txt
+cd simulator
+python 12_generate_comparison_set_21504.py --out /path/group3 --workers 24          # 4000 files, ~4.3 TB
+python 12_generate_comparison_set_21504.py --out /path/test --limit 2               # 8 files for a test
 ```
 
-Si falta pirate o la carpeta de datos, el lanzador lo dice antes de arrancar. Con 8 archivos y 64 beams tarda ~3–6 min. Se espera completitud de 100 % en los FRB con DM ≤ 1000 de esos archivos.
+It is deterministic: it generates the same files used in the tests (verified byte for byte). See `simulator/README.md`.
+
+## 5. First run
+
+```bash
+cd pirate/charts                                  # everything is run from charts/
+conda activate ~/envs/pirate                      # pirate is autodetected (or export CHARTS_PIRATE_ENV=~/envs/pirate)
+export CHARTS_SET_DIR=/path/to/group3
+python server/launcher.py local --config configs/test_64b.yml \
+    --out results/first --limit 2 --processes 16
+cat results/first/results.md results/first/alerts.md
+```
+
+If pirate or the data folder is missing, the launcher says so before starting. With 8 files and 64 beams it takes
+~3–6 min. Expected: 100 % completeness for the FRBs with DM ≤ 1000 in those files, and FRB alerts for the brightest ones.
