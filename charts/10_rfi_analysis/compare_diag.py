@@ -57,7 +57,7 @@ def evaluar_todos(d):
     if s.exists() or s.is_symlink():
         s.unlink()
     s.symlink_to(d / "eventos_todos.log")
-    subprocess.run([PY, str(PC / "evaluation" / "evaluate_test_64b.py"), str(sub)], capture_output=True, cwd=PC)
+    subprocess.run([PY, str(PC / "09_evaluation" / "evaluate_test_64b.py"), str(sub)], capture_output=True, cwd=PC)
     return (sub / "resultados.md").read_text(), np.load(sub / "mejor_snr_por_archivo.npy")
 
 

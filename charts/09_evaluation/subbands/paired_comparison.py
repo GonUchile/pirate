@@ -18,7 +18,7 @@ AQUI = Path(__file__).resolve().parent
 if "CHARTS_SUBBAND_RESULTS" not in os.environ:
     sys.exit("ERROR: export CHARTS_SUBBAND_RESULTS=/carpeta/con/completa_subbands/y/completa_banda_completa")
 BASE = Path(os.environ["CHARTS_SUBBAND_RESULTS"])   # carpeta con completa_subbands/ y completa_banda_completa/
-DD = Path(__file__).resolve().parents[2] / "configs" / "charts_64b_dm1000.yml"
+DD = Path(__file__).resolve().parents[2] / "06_configs" / "charts_64b_dm1000.yml"
 SEQ, DM_MIN, TOL_DM, TOL_T = 200, 20.0, 0.10, 0.05
 CORR = {"sb": ("completa_subbandas", 6.62), "bc": ("completa_banda_completa", 6.48)}
 

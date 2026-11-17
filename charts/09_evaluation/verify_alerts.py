@@ -6,7 +6,7 @@ For each alert in <run>/alerts.jsonl it looks for the file in the same beam whos
 Each alert is classified as true FRB, non-FRB (negative) or false alarm, and the FRBs that should have produced
 an alert (expected S/N ≥ threshold and DM in range) but did not are listed.
 
-Writes <run>/alerts.md. Usage: python evaluation/verify_alerts.py RUN_FOLDER
+Writes <run>/alerts.md. Usage: python 09_evaluation/verify_alerts.py RUN_FOLDER
 """
 import csv
 import json
@@ -21,7 +21,7 @@ if len(sys.argv) < 2:
     sys.exit(__doc__)
 D = Path(sys.argv[1])
 if not (D / "alerts.jsonl").exists():
-    sys.exit(f"ERROR: {D / 'alerts.jsonl'} does not exist (did the run use server/sifter/alert_sifter.py?)")
+    sys.exit(f"ERROR: {D / 'alerts.jsonl'} does not exist (did the run use 08_server/sifter/alert_sifter.py?)")
 alerts = [json.loads(x) for x in (D / "alerts.jsonl").read_text().splitlines() if x.strip()]
 cfg = yaml.safe_load(open(D / "test.yml")) if (D / "test.yml").exists() else {}
 rule = (cfg.get("server") or {}).get("alerts") or {}

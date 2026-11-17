@@ -25,7 +25,7 @@ at 501.6 MHz; `latency_s` is the time from when the pulse finished arriving (bot
 alert was emitted.
 
 Needs pirate's environment (grpc and pirate_frb). Usage:
-  python server/sifter/alert_sifter.py 127.0.0.1:7500 --out results/x [--threshold 7.6] [--action CMD]
+  python 08_server/sifter/alert_sifter.py 127.0.0.1:7500 --out results/x [--threshold 7.6] [--action CMD]
 """
 import argparse
 import json

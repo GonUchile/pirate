@@ -9,16 +9,16 @@ The project is split into independent pieces that communicate only over the netw
 ```
   Machine producing the data (X-engine or test)         Search machine (GPU)
   ┌──────────────────────────────────┐                 ┌───────────────────────────────────────────────┐
-  │ emitter/  (Python + numpy)       │   TCP, 4 bits   │ server/launcher.py                            │
+  │ 07_emitter/  (Python + numpy)       │   TCP, 4 bits   │ 08_server/launcher.py                            │
   │  reads .fil or another source,   │ ──────────────► │  pirate (this fork): RAM ring + GPU tree      │
   │  optional RFI and mask,          │  + scale/offset │  grouper v1: events in the DM-time map        │
   │  4 bits + scale/offset           │                 │  sifter: decides and emits FRB ALERTS         │
   └──────────────────────────────────┘                 └───────────────────────────────────────────────┘
-                                                        alerts.jsonl → evaluation/: verified alerts,
+                                                        alerts.jsonl → 09_evaluation/: verified alerts,
                                                                        completeness and false alarms
 ```
 
-The test data (4000 simulated FRBs, 21 504-channel `.fil` files) are generated with `simulator/`.
+The test data (4000 simulated FRBs, 21 504-channel `.fil` files) are generated with `01_simulator/`.
 The emitter does not depend on pirate: it can run on another machine. To port it to **Kotekan**, see
 [`docs/PROTOCOL_pirate_and_Kotekan_adaptation.md`](docs/PROTOCOL_pirate_and_Kotekan_adaptation.md).
 To understand what each file does, see [`docs/STRUCTURE.md`](docs/STRUCTURE.md).
@@ -53,11 +53,11 @@ Set A: expected S/N 8 · set B: fixed flux 617 Jy · partial: burst partly outsi
 signals with index ≠ −2 (non-FRB).
 
 Those results were obtained with an earlier chain (emitter based on pirate's `FakeXEngine`, not included here).
-The chain in this folder (`emitter/` + `server/launcher.py`) was validated against it: same detections in the 8-file test.
+The chain in this folder (`07_emitter/` + `08_server/launcher.py`) was validated against it: same detections in the 8-file test.
 
 ## FRB alerts
 
-The last stage, `server/sifter/alert_sifter.py`, decides which event is an FRB and emits an alert: one JSON line in
+The last stage, `08_server/sifter/alert_sifter.py`, decides which event is an FRB and emits an alert: one JSON line in
 `<out>/alerts.jsonl` (id, UTC arrival time at 501.6 MHz, beam, DM, S/N, width, coincident beams, latency), a
 message on the launcher console and, if configured, a command per alert with the JSON on standard input
 (`server.alerts.action`: notify, dump data, VOEvent...). Default rule (`server.alerts` in the YAML):
@@ -67,7 +67,7 @@ message on the launcher console and, if configured, a command per alert with the
 - a group (same arrival in consecutive blocks or in coincident beams) is emitted when one block passes without its S/N
   improving, with its best event: a bright pulse appears earlier at lower DMs and with lower S/N.
 
-`evaluation/verify_alerts.py` matches each alert with the injected FRBs → `alerts.md` (the `local` mode runs it).
+`09_evaluation/verify_alerts.py` matches each alert with the injected FRBs → `alerts.md` (the `local` mode runs it).
 8-file test without RFI (2026-11-15): 2 alerts, both true FRBs at the correct DM, 0 false alarms,
 latency 4.6–5.8 s from the end of the pulse arrival (≤ 2 s waiting for the end of the block + 2 s for the block
 without improvement + ~2.4 s of pirate and grouper).
@@ -86,23 +86,23 @@ conda activate /path/to/pirate/environment         # or export CHARTS_PIRATE_ENV
 export CHARTS_SET_DIR=/path/to/group3              # simulator .fil files (A_snr_fijo, B_amplitud_fija, negativos, parcial)
 
 # everything on this machine: server + emitter + evaluation (80 files)
-python server/launcher.py local --config configs/test_64b.yml --out results/short --limit 20 --processes 16
+python 08_server/launcher.py local --config 06_configs/test_64b.yml --out results/short --limit 20 --processes 16
 
 # with the site RFI and mask m1
-python server/launcher.py local --config configs/test_64b.yml --out results/short_rfi --limit 20 \
-    --rfi --mask site_rfi/mask_m1.npy
+python 08_server/launcher.py local --config 06_configs/test_64b.yml --out results/short_rfi --limit 20 \
+    --rfi --mask 05_site_rfi/mask_m1.npy
 
 # on two machines: on the search machine (with network.receivers = IP of this machine in the YAML) ...
-python server/launcher.py server --config configs/test_64b.yml --out results/remote
+python 08_server/launcher.py server --config 06_configs/test_64b.yml --out results/remote
 # ... and on the one producing the data (only needs numpy and PyYAML)
-python emitter/emitter.py --config configs/test_64b.yml --out results/remote --receivers 10.0.0.2:5000
+python 07_emitter/emitter.py --config 06_configs/test_64b.yml --out results/remote --receivers 10.0.0.2:5000
 # afterwards, on the search machine
-python evaluation/evaluate_test_64b.py results/remote
+python 09_evaluation/evaluate_test_64b.py results/remote
 ```
 
-Everything is configured in **one file** (`configs/test_64b.yml`): beams, channels, band, network (receivers,
+Everything is configured in **one file** (`06_configs/test_64b.yml`): beams, channels, band, network (receivers,
 connections), server memory, dedispersion and grouper parameters, alert rule, and emitter options. The emitter's
-command-line options (`python emitter/emitter.py --help`) override the YAML.
+command-line options (`python 07_emitter/emitter.py --help`) override the YAML.
 
 Before launching: the GPU must be free and the `network` ports unused (the launcher checks this).
 
@@ -110,11 +110,11 @@ Before launching: the GPU must be free and the `network` ports unused (the launc
 
 | Piece | Needs |
 |---|---|
-| `emitter/` | Python ≥ 3.9, numpy, PyYAML. Optional: cupy (`gpu: true`) and, for `--rfi`, the model `site_rfi/site_rfi_model.npz` (177 MB, not in git; regenerated with `site_rfi/01_` and `02_`) |
-| `server/` | this fork of pirate built (based on kmsmith137/pirate commit `255edd26`, 1.5.0), `sm_89`; its environment (Python 3.13, numpy 2.5, cupy 14.2); NVIDIA GPU (tested on RTX 4090, driver 590, CUDA 13.1); ~150 GB of RAM with the default config. Notes on pirate: [`docs/GUIDE_pirate_installation_usage_benchmark_CHARTS_2026-10-08.md`](docs/GUIDE_pirate_installation_usage_benchmark_CHARTS_2026-10-08.md). pirate's code was not modified |
-| `evaluation/` | pirate's environment (uses its `DedispersionConfig`) |
-| `site_rfi/` 00–07 | numpy, scipy, h5py, matplotlib; the site baseband to regenerate the model |
-| `simulator/` | Python 3.12, numpy, scipy, fitburst (CHIME/FRB, commit `3c76da8`): generates the 4000 group-3 .fil files (~4.3 TB; not in git) |
+| `07_emitter/` | Python ≥ 3.9, numpy, PyYAML. Optional: cupy (`gpu: true`) and, for `--rfi`, the model `05_site_rfi/site_rfi_model.npz` (177 MB, not in git; regenerated with `05_site_rfi/01_` and `02_`) |
+| `08_server/` | this fork of pirate built (based on kmsmith137/pirate commit `255edd26`, 1.5.0), `sm_89`; its environment (Python 3.13, numpy 2.5, cupy 14.2); NVIDIA GPU (tested on RTX 4090, driver 590, CUDA 13.1); ~150 GB of RAM with the default config. Notes on pirate: [`docs/GUIDE_pirate_installation_usage_benchmark_CHARTS_2026-10-08.md`](docs/GUIDE_pirate_installation_usage_benchmark_CHARTS_2026-10-08.md). pirate's code was not modified |
+| `09_evaluation/` | pirate's environment (uses its `DedispersionConfig`) |
+| `05_site_rfi/` 00–07 | numpy, scipy, h5py, matplotlib; the site baseband to regenerate the model |
+| `01_simulator/` | Python 3.12, numpy, scipy, fitburst (CHIME/FRB, commit `3c76da8`): generates the 4000 group-3 .fil files (~4.3 TB; not in git) |
 
 Performance of the Python emitter (64 beams, 16 processes, 16-core CPU): ~1.07× real time without RFI.
 
@@ -122,13 +122,13 @@ Performance of the Python emitter (64 beams, 16 processes, 16-core CPU): ~1.07×
 
 | Variable | Used by | Required |
 |---|---|---|
-| `CHARTS_SET_DIR` | emitter (if `emitter.set_dir` in the YAML is `null`), `quantization/` | yes, for the test |
+| `CHARTS_SET_DIR` | emitter (if `emitter.set_dir` in the YAML is `null`), `02_quantization/` | yes, for the test |
 | `CHARTS_PIRATE_ENV` | launcher and evaluation (if `environments.pirate` is `null`). Without it, `pirate_frb` is looked for in the active environment and in the PATH | no, if pirate's environment is activated |
-| `CHARTS_RFI_MODEL` | `--rfi`: `site_rfi_model.npz`, if it is not in `site_rfi/` | no |
-| `CHARTS_BASEBAND_DIR` | `site_rfi/00` and `01` (site baseband) | only to regenerate the RFI |
-| `CHARTS_RFI_RESULTS` | `rfi_analysis/` (folder with several runs) | only for those scripts |
-| `CHARTS_SUBBAND_RESULTS` | `evaluation/subbands/paired_comparison.py` | only for that script |
-| `CHARTS_RUN`, `CHARTS_ANALYSIS_OUT` | `evaluation/map_statistics/` (or pass the run as an argument) | no |
+| `CHARTS_RFI_MODEL` | `--rfi`: `site_rfi_model.npz`, if it is not in `05_site_rfi/` | no |
+| `CHARTS_BASEBAND_DIR` | `05_site_rfi/00` and `01` (site baseband) | only to regenerate the RFI |
+| `CHARTS_RFI_RESULTS` | `10_rfi_analysis/` (folder with several runs) | only for those scripts |
+| `CHARTS_SUBBAND_RESULTS` | `09_evaluation/subbands/paired_comparison.py` | only for that script |
+| `CHARTS_RUN`, `CHARTS_ANALYSIS_OUT` | `09_evaluation/map_statistics/` (or pass the run as an argument) | no |
 
 ## Data formats kept as generated
 

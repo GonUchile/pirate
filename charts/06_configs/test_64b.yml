@@ -33,7 +33,7 @@ server:                              # search machine
     full_log: true                   # all_events.log without the cap of 4 events per beam
     profile: false                   # per-stage timings in grouper_timings.csv
     extra: []                        # additional options for grouper_v1.py
-  alerts:                            # sifter: which event is an FRB alert (server/sifter/alert_sifter.py)
+  alerts:                            # sifter: which event is an FRB alert (08_server/sifter/alert_sifter.py)
     threshold: 7.6                   # S/N; ~10 false alarms/h for the 64-beam system with site RFI + mask m1
     dm_min: 20                       # terrestrial RFI has DM ~ 0
     dm_max: null
@@ -50,9 +50,9 @@ emitter:                             # can run on another machine
   beams_with_data: null              # null = all; N = only the first N beams read .fil files, the rest get fill
   fill: noise                        # noise | zeros
   quantization: fixed                # fixed | per_channel (per_channel is used with RFI)
-  mask: null                         # e.g. site_rfi/mask_m1.npy
+  mask: null                         # e.g. 05_site_rfi/mask_m1.npy
   rfi:
-    enabled: false                   # site RFI (requires site_rfi/site_rfi_model.npz)
+    enabled: false                   # site RFI (requires 05_site_rfi/site_rfi_model.npz)
     line_threshold_db: 10
     attenuation_db: 0
   pacing: real-time                  # real-time | ack | free

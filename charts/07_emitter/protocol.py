@@ -2,7 +2,7 @@
 
 Implements what pirate describes in notes/network_protocol.md, without depending on pirate:
 
-  Per TCP connection (one per emitter/receiver pair), when it opens:
+  Per TCP connection (one per 07_emitter/receiver pair), when it opens:
     uint32  0xf4bf4b02                (magic; the 02 is the version)
     uint32  flags                     (FLAG_ACK = 0x1: the receiver answers 1 byte per minichunk)
     uint32  text length, including >= 1 zero padding bytes

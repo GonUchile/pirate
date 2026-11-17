@@ -1,4 +1,4 @@
-"""Lectura de la cabecera SIGPROC (.fil) que usan las figuras de site_rfi/."""
+"""Lectura de la cabecera SIGPROC (.fil) que usan las figuras de 05_site_rfi/."""
 import numpy as np
 
 

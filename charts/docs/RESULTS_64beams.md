@@ -1,51 +1,52 @@
-# Resultados de la prueba de 64 beams en tiempo real
+# Results of the 64-beam real-time test
 
-Período: 2026-10-08 a 2026-11-05. Máquina: RTX 4090 (24 GB), Xeon w5-3435X (16 núcleos), 314 GB de RAM.
+Period: 2026-10-08 to 2026-11-05. Machine: RTX 4090 (24 GB), Xeon w5-3435X (16 cores), 314 GB of RAM.
 
-## 1. Configuración común
+## 1. Common configuration
 
-- Datos: grupo 3, 4000 .fil de 21 504 canales (9,389 kHz, 300–502 MHz), 1 ms, 8 bits (piso 32, σ = 4 cuentas), sin RFI propia. Sets de 1000: A (S/N esperado 8), B (617 Jy), negativos (índice de dispersión ≠ −2) y cortados.
-- Reparto en 64 streams (uno por beam), 10 s de ruido antes y 60 s después; 3510 s de stream por beam.
-- pirate: rank 15, un árbol, DM ≤ 1105, boxcar ≤ 32 ms (`configs/charts_64b_dm1000.yml`), servidor `configs/server_64b.yml`.
-- Acierto: DM ±10 % y tiempo ±máx(50 ms, boxcar). Falsas alarmas (FA): eventos fuera de las ventanas de señal, por beam·hora de tiempo sin señal. FP en negativos: no-FRB con algún evento a ±100 ms. Métricas con DM ≤ 1000.
+- Data: group 3, 4000 .fil files of 21 504 channels (9.389 kHz, 300–502 MHz), 1 ms, 8 bits (floor 32, σ = 4 counts), without RFI of their own. Sets of 1000: A (expected S/N 8), B (617 Jy), negatives (dispersion index ≠ −2) and partial.
+- Distributed over 64 streams (one per beam), with 10 s of noise before and 60 s after; 3510 s of stream per beam.
+- pirate: rank 15, one tree, DM ≤ 1105, boxcar ≤ 32 ms (`06_configs/charts_64b_dm1000.yml`), server `06_configs/server_64b.yml`.
+- Hit: DM ±10 % and time ±max(50 ms, boxcar). False alarms (FA): events outside the signal windows, per beam·hour of signal-free time. FP in negatives: non-FRB with any event within ±100 ms. Metrics with DM ≤ 1000.
 
-## 2. Referencia sin RFI con el toy grouper (2026-10-10)
+## 2. Reference without RFI with the toy grouper (2026-10-10)
 
-`resultados/completa_sin_rfi_toy_grouper.md`: a 10 FA por beam·hora (umbral 6,54), A 91,9 %, B 82,8 %, cortados 64,5 %,
-FP en negativos 41,1 %. Cadena a 1,98× el tiempo real.
+At 10 FA per beam·hour (threshold 6.54): A 91.9 %, B 82.8 %, partial 64.5 %, FP in negatives 41.1 %.
+Chain at 1.98× real time.
 
-## 3. RFI del sitio (T3d, 2026-11-03/04)
+## 3. Site RFI (T3d, 2026-11-03/04)
 
-- Modelo: baseband del sitio (2026-09-02, 8 antenas, 4,1 s) canalizado ×32 a 21 504 canales × 1 ms (`site_rfi/`). 2,1 % de los canales con líneas > 10 dB; RFI rápida angosta en el 0,5 % de los píxeles; sin impulsos de banda ancha.
-- Inyección al vuelo en el emisor (`--rfi-sitio`), con el mismo reloj en los 64 beams y normalización por canal y chunk.
-- **Sin mitigar** (prueba corta, 80 archivos): ~110× más candidatos (47 por beam y chunk), 99 % presentes en ≥ 32 beams; no hay umbral que llegue a 10 FA/h; completitud real ~8 % (21 % de los "aciertos" eran coincidencias al azar con RFI). Quitar el tope de 4 eventos por beam del grouper no recupera los FRB (`resultados/conteo_todos.md`).
-- Diagnóstico del grouper (`resultados/diag_agrupacion.md`): el descarte por t_top no es la causa; la unión de regiones con S/N ≥ 5 absorbe parte de los FRB (con umbral de celda 7 la detección real sube de ~8 a ~28 %), pero el problema de fondo es la RFI en el mapa de pirate.
+- Model: site baseband (2026-09-02, 8 antennas, 4.1 s) channelized ×32 to 21 504 channels × 1 ms (`05_site_rfi/`). 2.1 % of the channels with lines > 10 dB; narrow fast RFI in 0.5 % of the pixels; no broadband impulses.
+- Injected on the fly by the emitter (`--rfi`), with the same clock in the 64 beams and per-channel, per-block normalization.
+- **Unmitigated** (short test, 80 files): ~110× more candidates (47 per beam and block), 99 % present in ≥ 32 beams; no threshold reaches 10 FA/h; real completeness ~8 % (21 % of the "hits" were chance coincidences with RFI). Removing the grouper's cap of 4 events per beam does not recover the FRBs.
+- Grouper diagnosis: discarding by t_top is not the cause; the merging of regions with S/N ≥ 5 absorbs some FRBs (with cell threshold 7 the real detection rises from ~8 to ~28 %), but the underlying problem is the RFI in pirate's map.
 
-## 4. Máscara estática de canales (T3e, 2026-11-04/05)
+## 4. Static channel mask (T3e, 2026-11-04/05)
 
-- m1: líneas > 3 dB o RFI rápida > 1 % del tiempo = 17,5 % de la banda (quita el 98 % de la RFI rápida). m2: > 1 dB o > 0,2 % = 39 %.
-- Los canales enmascarados van como dato faltante (−8). pirate calcula el S/N suponiendo varianza 1 en todos los canales, así que la escala de los útiles se multiplica por √(N/N_útiles); sin esta corrección todo el S/N queda escalado por √(1 − f).
-- Pruebas cortas (`resultados/mascaras.md`): con RFI + m1 la detección real sube a 78 % (control 83 %); m2 pierde más S/N sin mejorar.
+- m1: lines > 3 dB or fast RFI > 1 % of the time = 17.5 % of the band (removes 98 % of the fast RFI). m2: > 1 dB or > 0.2 % = 39 %.
+- Masked channels are sent as missing data (−8). pirate computes the S/N assuming unit variance in every channel, so the scale of the good channels is multiplied by √(N/N_good); without this correction the whole S/N is scaled by √(1 − f).
+- Short tests: with RFI + m1 the real detection rises to 78 % (control 83 %); m2 loses more S/N without improving.
 
-### Corridas completas con m1 (`resultados/completas_m1.md`)
+### Full runs with m1
 
-| | Sin RFI + m1 | RFI + m1 |
+| | No RFI + m1 | RFI + m1 |
 |---|---|---|
-| Candidatos (S/N > 6, sin topes) | 49 496 (0,45 por beam y chunk) | 185 502 (1,7) |
-| FA a S/N ≥ 6 | 674 por beam·hora | 2 463 |
-| Umbral para 10 FA por beam·hora | 6,72 | 7,04 |
-| Completitud A / B / cortados | 88,9 / 82,5 / 63,2 % | 76,8 / 81,8 / 58,8 % |
-| FP en negativos | 40,7 % | 39,1 % |
-| Primer umbral sin FA (≤ 0,3 por beam·hora) | 7,24: 77,1 / 81,1 / 58,8 % | 7,60: 64,3 / 80,5 / 52,8 % |
-| Aciertos al azar (S/N ≥ 6) | ≤ 0,7 % | ≤ 2 % |
+| Candidates (S/N > 6, no caps) | 49 496 (0.45 per beam and block) | 185 502 (1.7) |
+| FA at S/N ≥ 6 | 674 per beam·hour | 2 463 |
+| Threshold for 10 FA per beam·hour | 6.72 | 7.04 |
+| Completeness A / B / partial | 88.9 / 82.5 / 63.2 % | 76.8 / 81.8 / 58.8 % |
+| FP in negatives | 40.7 % | 39.1 % |
+| First threshold without FA (≤ 0.3 per beam·hour) | 7.24: 77.1 / 81.1 / 58.8 % | 7.60: 64.3 / 80.5 / 52.8 % |
+| Chance hits (S/N ≥ 6) | ≤ 0.7 % | ≤ 2 % |
 
-## 5. Tiempos y recursos
+## 5. Timing and resources
 
-- Detección por bloque de 2,048 s (sin el emisor): pirate 0,17 s (`time_dedisperser`, 764 beams a tiempo real con la GPU dedicada) + grouper v1 0,32 s sin RFI / 0,42 s con RFI + m1 (`--perfil`) = **0,49 / 0,59 s**. La cadena completa con el emisor de prueba tarda 0,96 / 1,44 s por bloque: la frena el emisor.
-- Pendiente: medir la recepción por red y el armado de bloques dentro del servidor (el 0,17 s es del benchmark aislado).
-- Recursos (prueba corta con RFI + m1, por proceso): servidor de pirate 17,4 GiB de GPU, 150 GiB de RAM (todo el pool asignado; necesita ~20 GiB de árbol + el anillo), ~0,3 núcleos de media; grouper 0,6 GiB de GPU, ~0,15 núcleos.
-- Escalamiento (`scaling/`): la memoria del árbol crece ×4 por cada duplicación del DM máximo (rank +1); rank 16 es el máximo de pirate; árboles extra con muestras de 2 y 4 ms son mucho más baratos; con el árbol en RAM, el PCIe (~22 GB/s) limita la capacidad.
+- Detection per 2.048 s block (without the emitter): pirate 0.17 s (`time_dedisperser`, 764 beams in real time with the GPU to itself) + grouper v1 0.32 s without RFI / 0.42 s with RFI + m1 (`--profile`) = **0.49 / 0.59 s**. The full chain with the test emitter takes 0.96 / 1.44 s per block: the emitter slows it down.
+- FRB alerts (2026-11-15, 8 files without RFI): latency 4.6–5.8 s from the end of the pulse arrival to the alert (≤ 2 s waiting for the end of the block + 2 s for one block without S/N improvement + ~2.4 s of pirate and grouper).
+- Pending: measuring network reception and block assembly inside the server (the 0.17 s comes from the isolated benchmark).
+- Resources (short test with RFI + m1, per process): pirate server 17.4 GiB of GPU, 150 GiB of RAM (the whole allocated pool; it needs ~20 GiB of tree + the ring buffer), ~0.3 cores on average; grouper 0.6 GiB of GPU, ~0.15 cores.
+- Capacity (`04_pirate_capacity/`): the tree memory grows ×4 for each doubling of the maximum DM (rank +1); rank 16 is pirate's maximum; extra trees with 2 and 4 ms samples are much cheaper; with the tree in RAM, PCIe (~22 GB/s) limits the capacity.
 
-## 6. Limitaciones
+## 6. Limitations
 
-Ver el README principal. En particular: RFI de una sola captura de 4,1 s repetida (promedio de 8 antenas, más optimista que la antena 4), máscara armada con la misma captura que se inyecta, sin variaciones de nivel comunes a toda la banda y RFI idéntica en todos los beams.
+See the main README. In particular: RFI from a single 4.1 s capture repeated (average of 8 antennas, more optimistic than antenna 4), mask built from the same capture that is injected, no level variations common to the whole band, and identical RFI in all beams.

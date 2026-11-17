@@ -1,186 +1,181 @@
-# pirate: estructura de trabajo, nomenclatura y salidas de datos
+# pirate: work structure, naming and data outputs
 
-Referencia para CHARTS: 21 504 canales, 1 ms por muestra, 300–501,6 MHz, 64 beams, datos de 4 bits.
-Verificado contra el código de pirate instalado en `sources/pirate` (2026-10-23).
-Figuras generadas con `figuras_estructura_pirate.py` (en esta misma carpeta).
-Versión navegable con los mismos dibujos: https://claude.ai/artifact/UyukWK3oJgRc8uKz1hRPaC
+Reference for CHARTS: 21 504 channels, 1 ms per sample, 300–501.6 MHz, 64 beams, 4-bit data.
+Checked against pirate's code (v1.5.0, the folder above `charts/`) on 2026-10-23.
 
 ---
 
-## 1. Nomenclatura
+## 1. Naming
 
-Los nombres son los del autor de pirate. "Bloque" es solo la traducción de "chunk" que usamos en español.
+The names are those used by pirate's author.
 
-| Término | Qué es | Tamaño en CHARTS | Dónde está definido |
+| Term | What it is | Size in CHARTS | Where it is defined |
 |---|---|---|---|
-| muestra | Un instante de tiempo | 1 ms | — |
-| **minichunk** | 256 muestras. Así envía los datos cada x-node, y cada uno trae su escala y offset de 4 bits por canal | 256 ms | `notes/developer.md:43` |
-| **chunk** (bloque) | Rango de 2048 muestras de **todos los beams**. Es la unidad de proceso: pirate dedispersa y entrega el mapa una vez por chunk | 2,048 s · 64 frames · ~1,45 GB | `notes/developer.md:42` |
-| **batch** (lote) | Grupo de beams que la GPU procesa a la vez dentro de un chunk | `beams_per_batch` | `notes/developer.md:44` |
-| **frame** | Un par **(chunk, beam)**: un chunk de un solo beam. Es la unidad de almacenamiento | ~22,7 MB (datos crudos) | `notes/developer.md:45`, `include/pirate/MegaRingbuf.hpp:48` |
-| **frame_ringbuf** | Anillo de **datos crudos** (4 bits) en RAM del servidor | ~20 chunks (40 s) × 64 beams ≈ 28 GB | `FrbServer::frame_ringbuf` |
-| **MegaRingbuf** | Anillo de **sumas parciales** de la dedispersión, repartido en zonas de GPU y de RAM | depende de `max_gpu_clag` | `include/pirate/MegaRingbuf.hpp:18` |
-| **segment** | Trozo mínimo del MegaRingbuf (una línea de caché de la GPU) | 128 bytes | `notes/developer.md:46` |
-| **clag** (chunk lag) | Retardo de un dato del MegaRingbuf, en chunks: cuántos chunks hacia atrás guarda cada fila del árbol | 0 a 16 en el árbol 0 | `MegaRingbuf.hpp:55-57` |
-| **flag** (frame lag) | El mismo retardo, contado en frames (`flag = clag × num_batches`) | — | `MegaRingbuf.hpp:57` |
-| **zones** | Tramos del MegaRingbuf con distinto largo, cada uno en GPU o en RAM | — | `MegaRingbuf.hpp:59` |
-| **max_gpu_clag** | El clag más grande que queda en la VRAM; lo demás va a RAM | 5 en la prueba de 64 beams | `include/pirate/DedispersionConfig.hpp:101-103` |
+| sample | One time instant | 1 ms | — |
+| **minichunk** | 256 samples. This is how each X-node sends the data, each with its own 4-bit scale and offset per channel | 256 ms | `notes/developer.md:43` |
+| **chunk** | Range of 2048 samples of **all beams**. It is the processing unit: pirate dedisperses and delivers the map once per chunk | 2.048 s · 64 frames · ~1.45 GB | `notes/developer.md:42` |
+| **batch** | Group of beams the GPU processes at once within a chunk | `beams_per_batch` | `notes/developer.md:44` |
+| **frame** | A **(chunk, beam)** pair: one chunk of a single beam. It is the storage unit | ~22.7 MB (raw data) | `notes/developer.md:45`, `include/pirate/MegaRingbuf.hpp:48` |
+| **frame_ringbuf** | Ring buffer of **raw data** (4 bits) in the server's RAM | ~20 chunks (40 s) × 64 beams ≈ 28 GB | `FrbServer::frame_ringbuf` |
+| **MegaRingbuf** | Ring buffer of the dedispersion's **partial sums**, split into GPU and RAM zones | depends on `max_gpu_clag` | `include/pirate/MegaRingbuf.hpp:18` |
+| **segment** | Smallest piece of the MegaRingbuf (one GPU cache line) | 128 bytes | `notes/developer.md:46` |
+| **clag** (chunk lag) | Delay of a MegaRingbuf datum, in chunks: how many chunks back each tree row keeps | 0 to 16 in tree 0 | `MegaRingbuf.hpp:55-57` |
+| **flag** (frame lag) | The same delay, counted in frames (`flag = clag × num_batches`) | — | `MegaRingbuf.hpp:57` |
+| **zones** | Stretches of the MegaRingbuf with different lengths, each on the GPU or in RAM | — | `MegaRingbuf.hpp:59` |
+| **max_gpu_clag** | The largest clag kept in VRAM; the rest goes to RAM | 5 in the 64-beam test | `include/pirate/DedispersionConfig.hpp:101-103` |
 
-**Lo más fácil de confundir:**
-- **Chunk vs. frame:** un chunk son los frames de todos los beams en el mismo intervalo de 2,048 s. Con 64 beams, 1 chunk = 64 frames. pirate **procesa** de a un chunk y **guarda** de a un frame.
-- **Clag:** no es un dato sino un **número que tiene cada fila del árbol** (aproximadamente, cada DM). Las sumas parciales guardadas son la historia, en el MegaRingbuf.
-- **Dos anillos con contenido distinto:**
-  - frame_ringbuf: datos crudos, para volcados y para clasificadores sobre datos crudos;
-  - MegaRingbuf: sumas a medio terminar, internas de la dedispersión.
+**Easiest to confuse:**
+- **Chunk vs. frame:** a chunk is the frames of all beams in the same 2.048 s interval. With 64 beams, 1 chunk = 64 frames. pirate **processes** one chunk at a time and **stores** one frame at a time.
+- **Clag:** it is not a datum but a **number each tree row has** (roughly, each DM). The stored partial sums are the history, in the MegaRingbuf.
+- **Two ring buffers with different contents:**
+  - frame_ringbuf: raw data, for dumps and for classifiers on raw data;
+  - MegaRingbuf: half-finished sums, internal to the dedispersion.
 
-  pirate usa la palabra "frame" en los dos, siempre con el sentido de (chunk, beam).
+  pirate uses the word "frame" in both, always meaning (chunk, beam).
 
 ---
 
-## 2. Figuras
+## 2. Figures
 
-### Dentro de un frame
-![Un frame: 21 504 canales × 2048 muestras de 4 bits en 8 minichunks, más una escala y un offset por canal y minichunk](fig1_frame.png)
+### Inside a frame
+![A frame: 21 504 channels × 2048 4-bit samples in 8 minichunks, plus one scale and one offset per channel and minichunk](img/fig1_frame.png)
 
-- `data`: int4, forma (21 504, 2048), 22,0 MB. El valor −8 marca una muestra faltante.
-- `scales_offsets`: float16, forma (21 504, 8, 2), 0,69 MB.
-- Metadatos: `beam_id`, `time_chunk_index` y los metadatos del X-engine.
-- `intensidad = escala × valor_4bits + offset`, con la escala y el offset de su canal y su minichunk. En la GPU lo hace `GpuDequantizationKernel`.
-- Definición: `include/pirate/AssembledFrame.hpp`.
+- `data`: int4, shape (21 504, 2048), 22.0 MB. The value −8 marks a missing sample.
+- `scales_offsets`: float16, shape (21 504, 8, 2), 0.69 MB.
+- Metadata: `beam_id`, `time_chunk_index` and the X-engine metadata.
+- `intensity = scale × 4bit_value + offset`, with the scale and offset of its channel and minichunk. On the GPU this is done by `GpuDequantizationKernel`.
+- Definition: `include/pirate/AssembledFrame.hpp`.
 
-### De frame a chunk
-![Un chunk son los 64 frames de un mismo intervalo de 2,048 s](fig2_frame_chunk.png)
+### From frame to chunk
+![A chunk is the 64 frames of the same 2.048 s interval](img/fig2_frame_chunk.png)
 
-### La grilla beams × chunks
-![Grilla de beams por chunks: un frame es una casilla, un chunk una columna, un batch un grupo de beams de una columna, y el anillo de frames la ventana de las últimas columnas](fig3_grilla.png)
+### The beams × chunks grid
+![Grid of beams by chunks: a frame is a cell, a chunk a column, a batch a group of beams within a column, and the frame ring buffer the window of the last columns](img/fig3_grid.png)
 
-### Dónde vive cada cosa
-![Anillo de frames en RAM, MegaRingbuf repartido entre RAM y VRAM, árboles de dedispersión y mapa DM-tiempo hacia el grouper](fig4_almacenes.png)
+### Where each thing lives
+![Frame ring buffer in RAM, MegaRingbuf split between RAM and VRAM, dedispersion trees and DM-time map towards the grouper](img/fig4_storage.png)
 
-### El clag
-![Cada fila del árbol guarda clag chunks hacia atrás; las de clag hasta 5 en VRAM y el resto en RAM](fig5_clag.png)
+### The clag
+![Each tree row keeps clag chunks back; those with clag up to 5 in VRAM and the rest in RAM](img/fig5_clag.png)
 
-Con DM ≈ 1105 las frecuencias bajas llegan ~33 s después que las altas, por eso esa fila guarda 16 chunks.
+At DM ≈ 1105 the low frequencies arrive ~33 s after the high ones, which is why that row keeps 16 chunks.
 
-| `max_gpu_clag` | Dónde queda la historia | Costo por beam (árbol 0) |
+| `max_gpu_clag` | Where the history is kept | Cost per beam (tree 0) |
 |---|---|---|
-| 16 | Toda en la GPU | 0,56 GB de VRAM, sin tráfico de historia por PCIe |
-| 5 (la prueba de 64 beams) | 38 % en la GPU, 62 % en RAM | 0,22 GB de VRAM + 30 MB/s de PCIe |
-| 1 | Casi toda en RAM | 0,045 GB de VRAM + 56 MB/s de PCIe |
+| 16 | All on the GPU | 0.56 GB of VRAM, no history traffic over PCIe |
+| 5 (the 64-beam test) | 38 % on the GPU, 62 % in RAM | 0.22 GB of VRAM + 30 MB/s of PCIe |
+| 1 | Almost all in RAM | 0.045 GB of VRAM + 56 MB/s of PCIe |
 
-### La cadena completa
-![X-engines, servidor pirate, grouper, sifter y trigger: qué existe y qué falta](fig6_cadena.png)
+### The full chain
+![X-engines, pirate server, grouper, sifter and trigger: what exists and what is missing](img/fig6_chain.png)
 
 ---
 
-## 3. Cómo salen los datos de pirate
+## 3. How data come out of pirate
 
-pirate trabaja en un bucle: por cada **chunk**, por cada **batch** de beams y por cada **árbol** de dedispersión, entrega un resultado al grouper.
+pirate works in a loop: for each **chunk**, for each **batch** of beams and for each dedispersion **tree**, it delivers a result to the grouper.
 
-### 3.1 El mapa DM-tiempo (pirate → grouper, en la GPU)
+### 3.1 The DM-time map (pirate → grouper, on the GPU)
 
-Por cada árbol, dos arreglos de forma **(beams_per_batch, coarse_ndm, coarse_ntime)**:
-- `out_max`: S/N máximo en cada celda, sobre las posiciones DM-tiempo de la celda y sobre los anchos;
-- `out_argmax`: un token que codifica la posición exacta dentro de la celda y el ancho de ese máximo.
+For each tree, two arrays of shape **(beams_per_batch, coarse_ndm, coarse_ntime)**:
+- `out_max`: maximum S/N in each cell, over the DM-time positions of the cell and over the widths;
+- `out_argmax`: a token that encodes the exact position within the cell and the width of that maximum.
 
-`FrbGrouper.create_events()` lo convierte en DM, tiempo, ancho y sub-banda.
+`FrbGrouper.create_events()` converts it into DM, time, width and subband.
 
-Con la configuración de 3 árboles (`configs/charts_rt_r15t3.yml`):
+With the 3-tree configuration (`charts_rt_r15t3`):
 
-| Árbol | Rango de DM | DMs probados | Mapa por chunk (DM × tiempo) | Celda en DM | Celda en tiempo | Anchos |
+| Tree | DM range | DMs tried | Map per chunk (DM × time) | DM cell | Time cell | Widths |
 |---|---|---|---|---|---|---|
-| 0 (1 ms, rank 15) | 0 – 1107 | 32 768 | 2048 × 128 | 0,54 | 16 ms | 16 |
-| 1 (2 ms, rank 14) | 1107 – 2213 | 16 384 | 1024 × 64 | 1,08 | 32 ms | 13 |
-| 2 (4 ms, rank 14) | 2213 – 4427 | 16 384 | 1024 × 32 | 2,16 | 64 ms | 10 |
+| 0 (1 ms, rank 15) | 0 – 1107 | 32 768 | 2048 × 128 | 0.54 | 16 ms | 16 |
+| 1 (2 ms, rank 14) | 1107 – 2213 | 16 384 | 1024 × 64 | 1.08 | 32 ms | 13 |
+| 2 (4 ms, rank 14) | 2213 – 4427 | 16 384 | 1024 × 32 | 2.16 | 64 ms | 10 |
 
-En total pirate prueba 65 536 DMs: los árboles extra son de rank 14 y solo cubren la mitad superior de su rango.
+In total pirate tries 65 536 DMs: the extra trees are rank 14 and only cover the upper half of their range.
 
-**Condiciones para usar el mapa** (`notes/grouper_interface.md`):
-- Comparte memoria de GPU con pirate (memoria compartida por IPC); los metadatos van por gRPC por loopback.
-- Solo es válido **dentro del context manager de cada batch** (`grouper.get_output(ichunk, ibatch)`). Después pirate reusa esa memoria. Para guardar chunks anteriores hay que copiarlos (~67 MB por chunk para el árbol 0 con 64 beams).
-- El grouper tiene que terminar cada chunk en menos de 2,048 s, o frena a pirate.
-- No hay que tocar la GPU fuera del context manager de `FrbGrouper`.
+**Conditions for using the map** (`notes/grouper_interface.md`):
+- It shares GPU memory with pirate (shared memory over IPC); the metadata go over gRPC on loopback.
+- It is only valid **inside each batch's context manager** (`grouper.get_output(ichunk, ibatch)`). Afterwards pirate reuses that memory. To keep earlier chunks they must be copied (~67 MB per chunk for tree 0 with 64 beams).
+- The grouper must finish each chunk in less than 2.048 s, or it slows pirate down.
+- The GPU must not be touched outside `FrbGrouper`'s context manager.
 
-### 3.2 La lista de candidatos (grouper → sifter, por gRPC)
+### 3.2 The candidate list (grouper → sifter, over gRPC)
 
-Una vez por chunk, un `FrbEventsMessage` (`grpc/frb_sifter.proto`):
+Once per chunk, an `FrbEventsMessage` (`grpc/frb_sifter.proto`):
 
-| Campo | Contenido |
+| Field | Content |
 |---|---|
-| `chunk_fpga_start`, `chunk_fpga_end` | Rango de tiempo del chunk |
-| `coarsegrain_snr` | S/N máximo de cada beam en ese chunk (todos los beams) |
-| `events[]` | Lista de `FrbEvent` |
+| `chunk_fpga_start`, `chunk_fpga_end` | Time range of the chunk |
+| `coarsegrain_snr` | Maximum S/N of each beam in that chunk (all beams) |
+| `events[]` | List of `FrbEvent` |
 
-Cada `FrbEvent`:
+Each `FrbEvent`:
 
-| Campo | Contenido |
+| Field | Content |
 |---|---|
 | `beam_id` | Beam |
-| `fpga_timestamp` | Llegada al **borde inferior de la banda**; puede caer fuera del chunk |
-| `dm`, `snr`, `width_ms` | Decodificados del token: posición exacta, no la de la celda |
-| `subband_freq_lo_MHz`, `subband_freq_hi_MHz` | Banda donde se detectó (early triggers) |
-| `tree_index` | Árbol de origen |
-| `rfi_prob` | **Reservado para el clasificador**; hoy siempre vale 0 |
+| `fpga_timestamp` | Arrival at the **bottom edge of the band**; it can fall outside the chunk |
+| `dm`, `snr`, `width_ms` | Decoded from the token: exact position, not the cell's |
+| `subband_freq_lo_MHz`, `subband_freq_hi_MHz` | Band where it was detected (early triggers) |
+| `tree_index` | Tree of origin |
+| `rfi_prob` | **Reserved for the classifier**; currently always 0 |
 
-Antes de los eventos, el grouper manda al sifter un `ConfigMessage` con tres YAML: la configuración de pirate, los metadatos del X-engine y el plan de dedispersión.
+Before the events, the grouper sends the sifter a `ConfigMessage` with three YAMLs: pirate's configuration, the X-engine metadata and the dedispersion plan.
 
-### 3.3 Los datos crudos (frame_ringbuf → archivos, por pedido)
+### 3.3 The raw data (frame_ringbuf → files, on request)
 
-- No se leen directamente: se piden con el RPC **`WriteFiles`** (`grpc/frb_search.proto`), indicando beams y un rango de `fpga_seq`.
-- pirate escribe **un archivo por frame** en `{nfs_dir}/{acqdir}/frame_b(BEAM)_t(CHUNK).asdf`, con los datos de 4 bits, las escalas y offsets y los metadatos.
-- El rango puede incluir chunks **futuros**: se escriben a medida que llegan, y `SubscribeFiles` avisa cuando cada archivo está listo.
-- Si el rango ya salió del anillo, esos archivos simplemente no aparecen.
-- Clientes en Python: `pirate_frb/rpc/FrbSearchClient.py` y `FileSubscriber.py`.
-- **Costo:** un burst a DM ~1000 necesita ~17 chunks (~35 s) por beam, unos 370 MB escritos antes de poder clasificarlo.
+- They are not read directly: they are requested with the **`WriteFiles`** RPC (`grpc/frb_search.proto`), giving beams and an `fpga_seq` range.
+- pirate writes **one file per frame** in `{nfs_dir}/{acqdir}/frame_b(BEAM)_t(CHUNK).asdf`, with the 4-bit data, the scales and offsets and the metadata.
+- The range may include **future** chunks: they are written as they arrive, and `SubscribeFiles` reports when each file is ready.
+- If the range has already left the ring buffer, those files simply do not appear.
+- Python clients: `pirate_frb/rpc/FrbSearchClient.py` and `FileSubscriber.py`.
+- **Cost:** a burst at DM ~1000 needs ~17 chunks (~35 s) per beam, about 370 MB written before it can be classified.
 
 ---
 
-## 4. Qué existe y qué hay que construir
+## 4. What exists and what has to be built
 
-| Pieza | Estado | Lenguaje | Archivo |
+| Piece | Status | Language | File |
 |---|---|---|---|
-| Recepción, frames, anillo de frames | existe | C++ | `src_lib/`, `include/pirate/Receiver.hpp`, `AssembledFrame.hpp` |
-| Dedispersión en árbol + peak-finding por celdas | existe | C++/CUDA (kernels generados desde Python) | `include/pirate/Dedisperser.hpp`, `pirate_frb/cuda_generator/` |
-| MegaRingbuf (reparto GPU/RAM) | existe | C++/CUDA | `include/pirate/MegaRingbuf.hpp` |
-| Interfaz para leer el mapa y decodificar eventos | existe | Python sobre C++ | `pirate_frb/rpc/FrbGrouper.py` |
-| Volcado de frames (`WriteFiles`, `SubscribeFiles`) | existe; nadie lo llama | gRPC + Python | `pirate_frb/rpc/FrbSearchClient.py` |
-| Grouper | **solo de juguete**: máximo por beam y chunk, sin agrupar ni clasificar | Python/cupy | `pirate_frb/run_toy_grouper.py` |
-| Sifter | **solo de juguete**: imprime los eventos | Python | `pirate_frb/run_toy_sifter.py` |
-| Clasificador | **no existe** (solo el campo `rfi_prob`) | — | — |
-| Coincidencia entre beams, decisión, trigger a los x-nodes | **no existe** | — | — |
+| Reception, frames, frame ring buffer | exists (pirate) | C++ | `src_lib/`, `include/pirate/Receiver.hpp`, `AssembledFrame.hpp` |
+| Tree dedispersion + per-cell peak-finding | exists (pirate) | C++/CUDA (kernels generated from Python) | `include/pirate/Dedisperser.hpp`, `pirate_frb/cuda_generator/` |
+| MegaRingbuf (GPU/RAM split) | exists (pirate) | C++/CUDA | `include/pirate/MegaRingbuf.hpp` |
+| Interface to read the map and decode events | exists (pirate) | Python over C++ | `pirate_frb/rpc/FrbGrouper.py` |
+| Frame dumps (`WriteFiles`, `SubscribeFiles`) | exists (pirate); nobody calls it yet | gRPC + Python | `pirate_frb/rpc/FrbSearchClient.py` |
+| Grouper | pirate has only a toy one (maximum per beam and chunk); **CHARTS: grouper v1** (regions in the map, grouping per burst) | Python/cupy | `charts/08_server/grouper/grouper_v1.py` |
+| Sifter | pirate has only a toy one (prints the events); **CHARTS: alert sifter** (alert rule, RFI veto, `alerts.jsonl`) | Python | `charts/08_server/sifter/alert_sifter.py` |
+| Classifier | **does not exist** (only the `rfi_prob` field) | — | — |
+| Coordination between search nodes, trigger to the X-nodes | **does not exist** | — | — |
 
 ---
 
-## 5. Dónde encaja un clasificador
+## 5. Where a classifier fits
 
-| Etapa | Entrada | Dónde corre | Restricción |
+| Stage | Input | Where it runs | Constraint |
 |---|---|---|---|
-| 1 · sobre el mapa | Ventana de `out_max` (+ `out_argmax`) de cada árbol alrededor del evento | Dentro del grouper, en la GPU, cada chunk | < 2,048 s por chunk para todos los beams; sin redimensionar el mapa (recorte a resolución nativa) |
-| 2 · sobre datos crudos | Frames de 4 bits pedidos con `WriteFiles` → imágenes frecuencia-tiempo y DM-tiempo | Después del grouper o en el sifter, solo para los sobrevivientes | La lectura del anillo cuesta ~370 MB por candidato a DM ~1000 |
+| 1 · on the map | Window of `out_max` (+ `out_argmax`) of each tree around the event | Inside the grouper, on the GPU, every chunk | < 2.048 s per chunk for all beams; without resizing the map (cut-out at native resolution) |
+| 2 · on raw data | 4-bit frames requested with `WriteFiles` → frequency-time and DM-time images | After the grouper or in the sifter, only for the survivors | Reading the ring buffer costs ~370 MB per candidate at DM ~1000 |
 
-Presupuesto de tiempo real:
-- buffer de los x-nodes: ~40 s;
-- latencia de pirate a DM ~1000: ~33 s;
-- quedan **~5 s** para grouper + clasificador + trigger.
-
-Ver `docs/PLAN_testbench_clasificador_ML_FETCH_en_pirate_2026-10-22.md`.
+Real-time budget:
+- X-node buffer: ~40 s;
+- pirate's latency at DM ~1000: ~33 s;
+- **~5 s** remain for grouper + classifier + trigger.
 
 ---
 
-## Archivos relacionados
+## Related files
 
-- `docs/GUIDE_pirate_installation_usage_benchmark_CHARTS_2026-10-08.md`: instalación, uso y benchmark.
-- `docs/RESUMEN_pirate_CHARTS_paso_a_paso_2026-10-11.md`: memoria por beam, capacidad y prueba de 64 beams.
-- `sources/pirate/notes/grouper_interface.md`: interfaz pirate ↔ grouper (del autor).
-- `sources/pirate/notes/developer.md`: definiciones de chunk, batch, frame y segment (del autor).
+- `docs/GUIDE_pirate_installation_usage_benchmark_CHARTS_2026-10-08.md`: installation, usage and benchmark.
+- `notes/grouper_interface.md` (in pirate, the folder above `charts/`): pirate ↔ grouper interface (by the author).
+- `notes/developer.md` (in pirate): definitions of chunk, batch, frame and segment (by the author).
 
-## Anexo · Grouper v1 del testbench, paso a paso
+## Appendix · Grouper v1, step by step
 
-`grouper/grouper_v1.py`, explicado con figuras en `grouper_v1_paso_a_paso.html` (página: https://claude.ai/artifact/KyMfyPwgJxUrBrmAzBJirm). Las figuras se generan con `figuras_grouper_v1.py`.
+`08_server/grouper/grouper_v1.py`, explained with figures:
 
-![Entrada: mapa out_max](fig_g1_mapa.png)
-![Paso 1: regiones conexas sobre S/N 5](fig_g2_regiones.png)
-![Paso 2: máximo por región](fig_g3_maximos.png)
-![Paso 3: agrupación por t_top](fig_g4_ttop.png)
-![Paso 3b: caso entre chunks](fig_g6_entre_chunks.png)
-![Paso 4: salida al sifter, v1 frente a v0](fig_g5_salida.png)
+![Input: out_max map](img/fig_g1_map.png)
+![Step 1: connected regions above S/N 5](img/fig_g2_regions.png)
+![Step 2: maximum per region](img/fig_g3_maxima.png)
+![Step 3: grouping by t_top](img/fig_g4_ttop.png)
+![Step 3b: case across chunks](img/fig_g6_across_chunks.png)
+![Step 4: output to the sifter, v1 versus v0](img/fig_g5_output.png)

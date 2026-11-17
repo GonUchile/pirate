@@ -10,7 +10,7 @@ frecuencia más alta del .fil (centro del canal; 501,6 MHz en CHARTS). Es el mis
 que bench/pipelines.
 
 Uso (entorno conda de pirate):
-    python pirate_fil_search.py ARCHIVO.fil SALIDA.npy [--config configs/charts_search.yml]
+    python pirate_fil_search.py ARCHIVO.fil SALIDA.npy [--config 06_configs/charts_search.yml]
         [--snr 5] [--dm-min 20] [--dm-max 3000] [--cola-chunks 3] [--sin-agrupar]
         [--orden-freq {auto,asc,desc}]
 """
@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 
 AQUI = Path(__file__).resolve().parent
-CONFIG_DEFAULT = AQUI.parent / "configs" / "charts_search.yml"
+CONFIG_DEFAULT = AQUI.parent / "06_configs" / "charts_search.yml"
 
 _HDR_INT = {"nchans", "nbits", "nifs", "telescope_id", "machine_id", "data_type", "barycentric",
             "pulsarcentric", "nbeams", "ibeam"}

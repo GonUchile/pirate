@@ -5,7 +5,7 @@ Separates, per 2.048 s block, the time the grouper spends WAITING for pirate fro
 breaks down the stages. If the waiting is large, the bottleneck is upstream (emitter or reception); the detection's
 own time is pirate (time_dedisperser) + the grouper working.
 
-Usage: python evaluation/grouper_profile.py RUN_FOLDER [--skip 5]
+Usage: python 09_evaluation/grouper_profile.py RUN_FOLDER [--skip 5]
 """
 import argparse
 import csv

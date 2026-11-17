@@ -1,6 +1,6 @@
 import re, subprocess, json, itertools, statistics
 from pathlib import Path
-base = (Path(__file__).resolve().parent.parent / "configs" / "charts_64b_dm1000.yml").read_text()
+base = (Path(__file__).resolve().parent.parent / "06_configs" / "charts_64b_dm1000.yml").read_text()
 T1 = "  - {num_early_triggers: 0, max_width: 32, wt_dm_downsampling: 64, wt_time_downsampling: 64}\n"
 T2 = "  - {num_early_triggers: 0, max_width: 16, wt_dm_downsampling: 64, wt_time_downsampling: 64}\n"
 T3 = "  - {num_early_triggers: 0, max_width:  8, wt_dm_downsampling: 64, wt_time_downsampling: 64}\n"

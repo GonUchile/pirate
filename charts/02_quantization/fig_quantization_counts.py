@@ -22,7 +22,7 @@ from scipy.stats import norm
 
 HERE = Path(__file__).resolve().parent
 (HERE / "plots_21504").mkdir(exist_ok=True)
-SIM = HERE.parent / "simulator"                   # generador y física del simulador
+SIM = HERE.parent / "01_simulator"                   # generador y física del simulador
 spec = importlib.util.spec_from_file_location("gen", SIM / "12_generate_comparison_set_21504.py")
 GEN = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(GEN)

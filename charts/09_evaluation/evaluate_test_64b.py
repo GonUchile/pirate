@@ -33,7 +33,7 @@ if len(sys.argv) < 2:
 D = Path(sys.argv[1])
 HERE = Path(__file__).resolve().parent
 # dedispersion config: the one the launcher saved in the run, or the one in the repository
-DD = D / "config_dedispersion.yml" if (D / "config_dedispersion.yml").exists() else HERE.parent / "configs" / "charts_64b_dm1000.yml"
+DD = D / "config_dedispersion.yml" if (D / "config_dedispersion.yml").exists() else HERE.parent / "06_configs" / "charts_64b_dm1000.yml"
 SEQ = 200                     # seq per sample (1.000 ms clock of the emitter)
 DM_MIN = 20.0
 TOL_DM, TOL_T, TOL_NEG = 0.10, 0.05, 0.10

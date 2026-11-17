@@ -36,7 +36,7 @@ if len(sys.argv) < 2 and "CHARTS_RUN" not in os.environ:
 RUN = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(os.environ["CHARTS_RUN"])   # corrida completa con eventos_v0.log
 SALIDA = Path(os.environ.get("CHARTS_ANALYSIS_OUT", RUN / "analisis"))   # tablas y figuras
 SALIDA.mkdir(parents=True, exist_ok=True)
-DD = Path(__file__).resolve().parents[2] / "configs" / "charts_64b_dm1000.yml"
+DD = Path(__file__).resolve().parents[2] / "06_configs" / "charts_64b_dm1000.yml"
 SEQ, DM_MIN, TOL_DM, TOL_T = 200, 20.0, 0.10, 0.05
 T_CHUNK = 2.048
 UMBRAL_OP = 6.50                                   # 10 FP ruido/h en T2

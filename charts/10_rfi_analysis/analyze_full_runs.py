@@ -27,7 +27,7 @@ def evaluar(d, log, etiqueta):
     if s.exists() or s.is_symlink():
         s.unlink()
     s.symlink_to(log)
-    subprocess.run([PY, str(PC / "evaluation" / "evaluate_test_64b.py"), str(sub)], capture_output=True, cwd=PC)
+    subprocess.run([PY, str(PC / "09_evaluation" / "evaluate_test_64b.py"), str(sub)], capture_output=True, cwd=PC)
     return (sub / "resultados.md").read_text()
 
 

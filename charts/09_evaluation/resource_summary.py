@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Per-process resource summary (file from rfi_analysis/process_monitor.py): GPU memory and use, RAM and CPU
+"""Per-process resource summary (file from 10_rfi_analysis/process_monitor.py): GPU memory and use, RAM and CPU
 of the pirate server, the grouper, the sifter and the emitter, while the emitter is sending.
 
-Usage: python evaluation/resource_summary.py RUN_FOLDER/resources_per_process.csv
+Usage: python 09_evaluation/resource_summary.py RUN_FOLDER/resources_per_process.csv
 Notes: the GPU use from `nvidia-smi pmon` is a ~1 s sample every 5 s and underestimates processes that work in
 bursts (pirate); the emitter's RAM includes the .fil files mapped from the disk cache.
 """

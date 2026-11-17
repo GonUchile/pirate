@@ -1,6 +1,6 @@
 import re, subprocess, sys, json, itertools
 from pathlib import Path
-base = (Path(__file__).resolve().parent.parent / "configs" / "charts_64b_dm1000.yml").read_text()
+base = (Path(__file__).resolve().parent.parent / "06_configs" / "charts_64b_dm1000.yml").read_text()
 res = []
 for rank, nt in itertools.product([13, 14, 15, 16, 17, 18], [512, 1024, 2048, 4096, 8192]):
     clag = max(1, round(10.24 / (nt / 1000)))   # ~10 s en la GPU

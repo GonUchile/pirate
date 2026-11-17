@@ -4,13 +4,13 @@
 Subcommands:
   server    On the search machine: alert sifter + grouper v1 + pirate server. Keeps listening on the receivers
             of the YAML until Ctrl-C, `--duration`, or until the file <out>/STOP exists.
-  emitter   Runs emitter/emitter.py with the same YAML (can be on another machine: only needs numpy and PyYAML).
+  emitter   Runs 07_emitter/emitter.py with the same YAML (can be on another machine: only needs numpy and PyYAML).
   local     Both on this machine, one after the other, and evaluates the run at the end.
 
 Usage:
-  python server/launcher.py local   --config configs/test_64b.yml --out results/short --limit 20
-  python server/launcher.py server  --config configs/test_64b.yml --out results/remote
-  python server/launcher.py emitter --config configs/test_64b.yml --out results/remote --receivers 10.0.0.2:5000
+  python 08_server/launcher.py local   --config 06_configs/test_64b.yml --out results/short --limit 20
+  python 08_server/launcher.py server  --config 06_configs/test_64b.yml --out results/remote
+  python 08_server/launcher.py emitter --config 06_configs/test_64b.yml --out results/remote --receivers 10.0.0.2:5000
 Options that are not the launcher's (--limit, --rfi, --mask, --pacing, ...) are passed to the emitter.
 
 In <out>: config_dedispersion.yml and config_server.yml (generated), server.log, grouper.log, sifter.log,
@@ -189,7 +189,7 @@ def start_server(cfg, out, pr):
     pr.monitor(["nvidia-smi", "--query-gpu=timestamp,utilization.gpu,memory.used,power.draw", "--format=csv", "-l", "5"], "gpu.csv")
     pr.monitor(["vmstat", "-t", "5"], "vmstat.log")
     al = s.get("alerts") or {}
-    args_s = [py, str(ROOT / "server" / "sifter" / "alert_sifter.py"), net.get("sifter", "127.0.0.1:7500"),
+    args_s = [py, str(ROOT / "08_server" / "sifter" / "alert_sifter.py"), net.get("sifter", "127.0.0.1:7500"),
               "--out", str(out), "--threshold", str(al.get("threshold", 7.6)), "--dm-min", str(al.get("dm_min", 20)),
               "--max-beams", str(al.get("max_beams", 8)), "--window-s", str(al.get("window_s", 0.5))]
     args_s += ["--dm-max", str(al["dm_max"])] if al.get("dm_max") is not None else []
@@ -199,7 +199,7 @@ def start_server(cfg, out, pr):
     threading.Thread(target=show_alerts, args=(out / "alerts.jsonl", pr), daemon=True).start()
     time.sleep(3)
     g = s.get("grouper", {})
-    args_g = [py, str(ROOT / "server" / "grouper" / "grouper_v1.py"), net.get("grouper", "127.0.0.1:7000"),
+    args_g = [py, str(ROOT / "08_server" / "grouper" / "grouper_v1.py"), net.get("grouper", "127.0.0.1:7000"),
               "-s", net.get("sifter", "127.0.0.1:7500"), "-t", str(g.get("threshold", 6)), "--out", str(out / "windows")]
     args_g += ["--no-windows"] if not g.get("windows", False) else []
     args_g += ["--log-all", str(out / "all_events.log")] if g.get("full_log", True) else []
@@ -214,7 +214,7 @@ def start_server(cfg, out, pr):
 
 
 def emitter_cmd(cfg_path, out, extra):
-    return [sys.executable, str(ROOT / "emitter" / "emitter.py"), "--config", str(cfg_path), "--out", str(out)] + extra
+    return [sys.executable, str(ROOT / "07_emitter" / "emitter.py"), "--config", str(cfg_path), "--out", str(out)] + extra
 
 
 def main():
@@ -257,9 +257,9 @@ def main():
         pr.shutdown()
     if a.mode == "local" and not a.no_eval:
         py, _ = pirate_environment(cfg)
-        subprocess.call([py, str(ROOT / "evaluation" / "evaluate_test_64b.py"), str(a.out)])
+        subprocess.call([py, str(ROOT / "09_evaluation" / "evaluate_test_64b.py"), str(a.out)])
         pr.log(f"evaluation in {a.out / 'results.md'}")
-        subprocess.call([py, str(ROOT / "evaluation" / "verify_alerts.py"), str(a.out)])
+        subprocess.call([py, str(ROOT / "09_evaluation" / "verify_alerts.py"), str(a.out)])
 
 
 if __name__ == "__main__":

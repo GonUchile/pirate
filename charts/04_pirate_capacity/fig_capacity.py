@@ -118,6 +118,6 @@ fig.text(0.5, 0.01, "Memoria GPU y RAM en GB = lo que reserva pirate para la ded
          "limita la capacidad cuando el árbol usa la RAM.\nRank 17 o más no está permitido en pirate (máximo 16); para DM "
          "más alto se agregan árboles con muestras de 2 y 4 ms.", ha="center", va="bottom", fontsize=11.5, color="0.3")
 fig.tight_layout(rect=(0, 0.085, 1, 0.96))
-out = AQUI / "scaling_resources.png"
+out = AQUI / "pirate_capacity.png"
 fig.savefig(out, dpi=150)
 print(out)

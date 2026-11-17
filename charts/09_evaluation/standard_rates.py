@@ -7,7 +7,7 @@ Reports, for one run:
   - the same at 10 FA per hour of the SYSTEM (10 / nbeams per beam·hour). If the signal-free time is not enough to
     resolve that rate, the first threshold without any noise event is used and a note is printed.
 
-Usage: python evaluation/standard_rates.py RUN_FOLDER [--log all_events.log]
+Usage: python 09_evaluation/standard_rates.py RUN_FOLDER [--log all_events.log]
        (sifter.log by default; with --log another log in the same format is evaluated, e.g. the grouper's full log)
 """
 import argparse

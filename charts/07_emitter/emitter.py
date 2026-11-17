@@ -13,8 +13,8 @@ connection waits for pirate's acknowledgement before the next minichunk: as fast
 `free` (no pause).
 
 Usage:
-  python emitter/emitter.py --config configs/test_64b.yml --out results/run [options that override the YAML]
-  e.g. --limit 20 --rfi --mask site_rfi/mask_m1.npy --pacing ack --receivers 10.0.0.2:5000,10.0.0.2:5001
+  python 07_emitter/emitter.py --config 06_configs/test_64b.yml --out results/run [options that override the YAML]
+  e.g. --limit 20 --rfi --mask 05_site_rfi/mask_m1.npy --pacing ack --receivers 10.0.0.2:5000,10.0.0.2:5001
 
 Outputs in --out: assignment.csv (which file goes in which beam and from which sample), emitter.json, emitter.log.
 """
@@ -45,7 +45,7 @@ DT_NS_PER_SEQ = 5000                                 # 5 µs per seq count; 1 ms
 def load_config(a):
     cfg = yaml.safe_load(open(a.config)) if a.config else {}
     t, net, e = cfg.get("test", {}), cfg.get("network", {}), cfg.get("emitter", {})
-    root = HERE.parent                               # the charts/ folder: site_rfi/ and relative paths (independent of the YAML location)
+    root = HERE.parent                               # the charts/ folder: 05_site_rfi/ and relative paths (independent of the YAML location)
     c = dict(
         beams=t.get("beams", 64), channels=t.get("channels", 21504), band=t.get("band_mhz", [299.8497764530551, 501.7502235469449]),
         sample_ms=t.get("sample_ms", 1.0), T=t.get("block_samples", 2048),
@@ -55,7 +55,7 @@ def load_config(a):
         beams_with_data=e.get("beams_with_data"), fill=e.get("fill", "noise"),
         quantization=e.get("quantization", "fixed"), mask=e.get("mask"), rfi=e.get("rfi", {}) or {},
         pacing=e.get("pacing", "real-time"), speed=e.get("speed", 1.0), processes=e.get("processes", 8),
-        gpu=e.get("gpu", False), seed=e.get("seed", 1), rfi_dir=str(root / "site_rfi"),
+        gpu=e.get("gpu", False), seed=e.get("seed", 1), rfi_dir=str(root / "05_site_rfi"),
         precomputed_noise=e.get("precomputed_noise", True),
     )
     for k in ("receivers", "connections", "set_dir", "limit", "beams_with_data", "fill", "quantization", "mask",
@@ -154,7 +154,7 @@ def prepare(w, beams, c, segments, n_data, total, shm_data, shm_so, tasks, done)
 # ----------------------------------------------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--config", help="test YAML (configs/test_64b.yml)")
+    ap.add_argument("--config", help="test YAML (06_configs/test_64b.yml)")
     ap.add_argument("--out", required=True, type=Path, help="output folder")
     ap.add_argument("--receivers", help="comma-separated list of host:port")
     ap.add_argument("--connections", type=int, help="connections per receiver")

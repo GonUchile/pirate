@@ -7,10 +7,10 @@ What to install depends on which piece runs on each machine:
 
 | Machine | Runs | Needs |
 |---|---|---|
-| **Search machine** (with an NVIDIA GPU) | `server/` (pirate + grouper + sifter), `evaluation/` | the fork built, ksgpu and their conda environment |
-| **Machine producing the data** (can be the same) | `emitter/` | Python ≥ 3.9 with numpy and PyYAML, the clone of the fork (only `charts/` is used), the data |
-| **To generate the test data** (once) | `simulator/` | Python 3.12, numpy, scipy and fitburst (`simulator/requirements.txt`) |
-| **To regenerate the site RFI** (optional) | `site_rfi/` 00–07 | numpy, scipy, h5py, matplotlib and the site baseband |
+| **Search machine** (with an NVIDIA GPU) | `08_server/` (pirate + grouper + sifter), `09_evaluation/` | the fork built, ksgpu and their conda environment |
+| **Machine producing the data** (can be the same) | `07_emitter/` | Python ≥ 3.9 with numpy and PyYAML, the clone of the fork (only `charts/` is used), the data |
+| **To generate the test data** (once) | `01_simulator/` | Python 3.12, numpy, scipy and fitburst (`01_simulator/requirements.txt`) |
+| **To regenerate the site RFI** (optional) | `05_site_rfi/` 00–07 | numpy, scipy, h5py, matplotlib and the site baseband |
 
 ## 1. Repositories and tested versions
 
@@ -18,7 +18,7 @@ What to install depends on which piece runs on each machine:
 |---|---|---|---|
 | **pirate (CHARTS fork)** | https://github.com/charts-experiment/pirate | based on kmsmith137/pirate commit `255edd26c1c77e3f154fc5accd8014f073582b66` (v1.5.0, 2026-09-07) | Network reception and tree dedispersion on the GPU. This repository; `charts/` is the CHARTS code and the rest is unchanged pirate |
 | **ksgpu** | https://github.com/kmsmith137/ksgpu | commit `5c81be2dea54226587f80eb206a35ca92c7160c5` (v1.5.0, 2026-09-07) | GPU library used by pirate (required dependency) |
-| **fitburst** (CHIME/FRB) | https://github.com/CHIMEFRB/fitburst | commit `3c76da8f9e3ec7bc21951ce1b4a26a0255096b69` | Pulse shape for the simulator (`simulator/`) |
+| **fitburst** (CHIME/FRB) | https://github.com/CHIMEFRB/fitburst | commit `3c76da8f9e3ec7bc21951ce1b4a26a0255096b69` | Pulse shape for the simulator (`01_simulator/`) |
 | Kotekan (optional) | git@github.com:charts-experiment/kotekan.git | commit `1917da5b` (2021.10-426) | Reference for porting the emitter (`docs/PROTOCOL_pirate_and_Kotekan_adaptation.md`); not needed to run the test |
 
 The original pirate is https://github.com/kmsmith137/pirate. If the fork is updated with newer versions from
@@ -35,7 +35,7 @@ kmsmith137 it may work, but the network protocol, the configs and the compiled k
 | System CUDA toolkit (`nvcc`) | 13.1 |
 | System compiler | gcc / g++ 13.3 (Ubuntu 24.04) |
 | conda (miniconda or miniforge) | any recent one |
-| RAM | ≥ 150 GB with `configs/test_64b.yml` (64 GB with the optimized config) |
+| RAM | ≥ 150 GB with `06_configs/test_64b.yml` (64 GB with the optimized config) |
 | Disk | ~10 GB for the environment and the build |
 
 ### Automatic installation
@@ -76,8 +76,8 @@ python -m pip install pipmake                                   # ALWAYS use "py
 ```bash
 conda activate ~/envs/pirate
 pirate_frb --help
-pirate_frb show dedisperser charts/configs/charts_64b_dm1000.yml       # tree memory: host_zones / gpu_zones
-pirate_frb time_dedisperser -H -n 24 charts/configs/charts_64b_dm1000.yml   # RTX 4090: ~764 beams in real time
+pirate_frb show dedisperser charts/06_configs/charts_64b_dm1000.yml       # tree memory: host_zones / gpu_zones
+pirate_frb time_dedisperser -H -n 24 charts/06_configs/charts_64b_dm1000.yml   # RTX 4090: ~764 beams in real time
 ```
 
 ### Problems found and how they were solved
@@ -98,7 +98,7 @@ installation is editable; the pip step does not need to be repeated).
 
 ```bash
 git clone https://github.com/charts-experiment/pirate.git && cd pirate/charts
-python3 -m pip install -r emitter/requirements.txt              # numpy and PyYAML
+python3 -m pip install -r 07_emitter/requirements.txt              # numpy and PyYAML
 # optional, to quantize or inject RFI on the GPU (gpu: true in the YAML): cupy for the machine's CUDA version
 ```
 
@@ -109,8 +109,8 @@ environment can be used (it already has numpy, PyYAML and cupy).
 
 | Data | Size | Where it comes from | Variable |
 |---|---|---|---|
-| Group 3: 4000 .fil files of 21 504 channels (A, B, negatives, partial) with `manifest.csv` | ~4.3 TB | `simulator/12_generate_comparison_set_21504.py` (see section 4b) | `CHARTS_SET_DIR` |
-| Site RFI model `site_rfi_model.npz` | 177 MB | `site_rfi/01_dynamic_spectrum.py` + `02_rfi_model.py` from the baseband | `CHARTS_RFI_MODEL` |
+| Group 3: 4000 .fil files of 21 504 channels (A, B, negatives, partial) with `manifest.csv` | ~4.3 TB | `01_simulator/12_generate_comparison_set_21504.py` (see section 4b) | `CHARTS_SET_DIR` |
+| Site RFI model `site_rfi_model.npz` | 177 MB | `05_site_rfi/01_dynamic_spectrum.py` + `02_rfi_model.py` from the baseband | `CHARTS_RFI_MODEL` |
 | Site baseband (2026-09-02) | 25 GB | capture from the CHARTS X-engine | `CHARTS_BASEBAND_DIR` |
 
 For a quick test without the full set, `--beams-with-data 1 --limit 2` uses only 8 files.
@@ -118,14 +118,14 @@ For a quick test without the full set, `--beams-with-data 1 --limit 2` uses only
 ## 4b. Generating the test data
 
 ```bash
-python3.12 -m venv ~/envs/simulator && source ~/envs/simulator/bin/activate
-python -m pip install -r simulator/requirements.txt
+python3.12 -m venv ~/envs/simulator && source ~/envs/01_simulator/bin/activate
+python -m pip install -r 01_simulator/requirements.txt
 cd simulator
 python 12_generate_comparison_set_21504.py --out /path/group3 --workers 24          # 4000 files, ~4.3 TB
 python 12_generate_comparison_set_21504.py --out /path/test --limit 2               # 8 files for a test
 ```
 
-It is deterministic: it generates the same files used in the tests (verified byte for byte). See `simulator/README.md`.
+It is deterministic: it generates the same files used in the tests (verified byte for byte). See `01_simulator/README.md`.
 
 ## 5. First run
 
@@ -133,7 +133,7 @@ It is deterministic: it generates the same files used in the tests (verified byt
 cd pirate/charts                                  # everything is run from charts/
 conda activate ~/envs/pirate                      # pirate is autodetected (or export CHARTS_PIRATE_ENV=~/envs/pirate)
 export CHARTS_SET_DIR=/path/to/group3
-python server/launcher.py local --config configs/test_64b.yml \
+python 08_server/launcher.py local --config 06_configs/test_64b.yml \
     --out results/first --limit 2 --processes 16
 cat results/first/results.md results/first/alerts.md
 ```

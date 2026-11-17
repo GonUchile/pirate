@@ -20,7 +20,7 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 (HERE / "plots_21504").mkdir(exist_ok=True)
-SIM = HERE.parent / "simulator"                   # generador y física del simulador
+SIM = HERE.parent / "01_simulator"                   # generador y física del simulador
 _spec = importlib.util.spec_from_file_location("gen07", SIM / "07_generate_comparison_set.py")
 G = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(G)

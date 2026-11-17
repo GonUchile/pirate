@@ -1,49 +1,52 @@
-# Simulador de FRB: el set de prueba de 21 504 canales (grupo 3)
+# FRB simulator: the 21 504-channel test set (group 3)
 
-Genera los 4000 archivos `.fil` con los que se hizo la prueba de 64 beams: 1000 por set.
+Generates the 4000 `.fil` files used in the 64-beam test: 1000 per set.
 
-| Set | Carpeta | Qué es |
+| Set | Folder | What it is |
 |---|---|---|
-| A | `A_snr_fijo` | FRB con S/N esperado 8 (el flujo se ajusta a cada pulso) |
-| B | `B_amplitud_fija` | los mismos FRB con flujo fijo de 616,87 Jy (el S/N sale de la física de cada uno) |
-| NEG | `negativos` | pares de A con índice de dispersión ≠ −2 (no-FRB) |
-| P | `parcial` | FRB con S/N 15 cortados por el borde del archivo (5–95 % de la energía visible) |
+| A | `A_snr_fijo` | FRBs with expected S/N 8 (the flux is adjusted to each pulse) |
+| B | `B_amplitud_fija` | the same FRBs with a fixed flux of 616.87 Jy (the S/N follows from each one's physics) |
+| NEG | `negativos` | pairs of A with dispersion index ≠ −2 (non-FRB) |
+| P | `parcial` | FRBs with S/N 15 cut by the edge of the file (5–95 % of the energy visible) |
 
-Física (de `07_generate_comparison_set.py`, función `modelo()`): pulso gaussiano con scattering que conserva la
-energía, espectro tomado de bursts reales del catálogo de CHIME (formas de `catalogs/`), dispersión con smearing
-dentro de cada canal y sobremuestreo ×4. Ruido de 256 antenas (SEFD de `engine/charts_sefd.py`). DM uniforme entre
-100 y 3000. Sin RFI (la RFI se agrega al emitir, ver `site_rfi/`).
+The folder names (and the `manifest.csv` columns) are the ones the generator writes; they are kept unchanged so that
+the existing dataset remains readable and the generator reproduces it byte for byte.
 
-Formato: 21 504 canales de 9,389 kHz (672 gruesos × 32), 299,85–501,75 MHz, 1 ms, 8 bits (piso 32, σ = 4 cuentas),
-cabecera SIGPROC con canales en orden descendente. Largo variable (7–98 s). Un `manifest.csv` por set con los
-parámetros de cada archivo y `t_top_s` = llegada a 501,6 MHz.
+Physics (from `07_generate_comparison_set.py`, function `modelo()`): gaussian pulse with energy-conserving
+scattering, spectrum taken from real bursts in the CHIME catalog (shapes from `catalogs/`), dispersion with smearing
+within each channel and ×4 oversampling. Noise of 256 antennas (SEFD from `engine/charts_sefd.py`). DM uniform between
+100 and 3000. No RFI (the RFI is added when emitting, see `05_site_rfi/`).
 
-## Archivos
+Format: 21 504 channels of 9.389 kHz (672 coarse × 32), 299.85–501.75 MHz, 1 ms, 8 bits (floor 32, σ = 4 counts),
+SIGPROC header with channels in descending order. Variable length (7–98 s). One `manifest.csv` per set with the
+parameters of each file and `t_top_s` = arrival at 501.6 MHz.
 
-| Archivo | Qué hace |
+## Files
+
+| File | What it does |
 |---|---|
-| `12_generate_comparison_set_21504.py` | **El generador del grupo 3.** Reanudable (`_hechos.jsonl`), en paralelo |
-| `07_generate_comparison_set.py` | Física del pulso y utilidades; también genera el grupo 2 (672 canales) |
-| `03_convert_to_fil.py` | Escritura de los `.fil` y escala de 8 bits |
-| `engine/charts_sefd.py`, `engine/fitburst_sim.py` | SEFD de CHARTS y constantes/forma de pulso de fitburst |
-| `catalogs/` | Catálogos de CHIME/FRB (Catálogo 1 limpio y Catálogo 2): de ahí salen ancho, scattering y espectro |
-| `group2_drawn_parameters.csv` | Los 2000 sorteos (1000 principales + 1000 cortados) que reutiliza el grupo 3 |
-| `reconstruct_draws.py` | Cómo se obtuvo el CSV anterior desde los `manifest.csv` del grupo 3 |
+| `12_generate_comparison_set_21504.py` | **The group-3 generator.** Resumable (`_hechos.jsonl`), parallel |
+| `07_generate_comparison_set.py` | Pulse physics and utilities; also generates group 2 (672 channels) |
+| `03_convert_to_fil.py` | Writing the `.fil` files and the 8-bit scale |
+| `engine/charts_sefd.py`, `engine/fitburst_sim.py` | CHARTS SEFD and fitburst constants/pulse shape |
+| `catalogs/` | CHIME/FRB catalogs (clean Catalog 1 and Catalog 2): width, scattering and spectrum come from them |
+| `group2_drawn_parameters.csv` | The 2000 draws (1000 main + 1000 partial) reused by group 3 |
+| `reconstruct_draws.py` | How the previous CSV was obtained from the group-3 `manifest.csv` files |
 
-El grupo 3 reutiliza los sorteos del grupo 2. El original (`outputs_comparacion/parametros_sorteados.csv`) está en un
-disco externo; `group2_drawn_parameters.csv` se reconstruyó desde los manifiestos del grupo 3 y se verificó que
-regenera los archivos **idénticos byte a byte** (A_000 y P_p000_inicio, 2026-11-15).
+Group 3 reuses the group-2 draws. The original draw file is on an external disk; `group2_drawn_parameters.csv` was
+reconstructed from the group-3 manifests and verified to regenerate the files **byte for byte** (A_000 and
+P_p000_inicio, 2026-11-15).
 
-## Uso
+## Usage
 
 ```bash
-python 12_generate_comparison_set_21504.py --out /ruta/grupo3 --workers 24            # los 4000 (~4,3 TB)
-python 12_generate_comparison_set_21504.py --out /ruta/prueba --limite 2 --sets A,B   # unos pocos para probar
+python 12_generate_comparison_set_21504.py --out /path/group3 --workers 24           # all 4000 (~4.3 TB)
+python 12_generate_comparison_set_21504.py --out /path/test --limit 2 --sets A,B     # a few for a test
 ```
 
-Después: `export CHARTS_SET_DIR=/ruta/grupo3` para el emisor.
+Then: `export CHARTS_SET_DIR=/path/group3` for the emitter.
 
-## Requisitos
+## Requirements
 
-Python 3.12 (probado), numpy 2.5, scipy 1.18 y **fitburst** de CHIME/FRB:
-`pip install -r requirements.txt` (instala fitburst desde GitHub en el commit probado).
+Python 3.12 (tested), numpy 2.5, scipy 1.18 and **fitburst** from CHIME/FRB:
+`pip install -r requirements.txt` (installs fitburst from GitHub at the tested commit).

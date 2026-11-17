@@ -12,7 +12,7 @@ def role(args):
     if "run server" in args: return "pirate_server"
     if "grouper_v1" in args or "toy_grouper" in args or "grouper_testbench" in args: return "grouper"
     if "toy_sifter" in args or "alert_sifter" in args: return "sifter"
-    if "emitter/emitter.py" in args or "emisor_fil" in args: return "emitter"
+    if "07_emitter/emitter.py" in args or "emisor_fil" in args: return "emitter"
     return None
 
 
